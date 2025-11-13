@@ -31,7 +31,11 @@ yarn-error.*
 *.pem
 
 # local env files
+# IMPORTANT: .env contains sensitive API keys and should NEVER be committed
+.env
 .env*.local
+.env.development
+.env.production
 
 # typescript
 *.tsbuildinfo
