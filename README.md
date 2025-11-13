@@ -43,12 +43,138 @@ POCHOCLO/
     │   └── HomeScreen.tsx  # Main home screen
     │
     ├── components/         # Reusable UI components
+    │   └── Button.tsx      # Example reusable button component
     │
     ├── config/             # Configuration files
     │   └── supabase.ts     # Supabase client setup
     │
+    ├── theme/              # Design system (NEW!)
+    │   ├── colors.ts       # Color palette
+    │   ├── spacing.ts      # Spacing scale (8pt grid)
+    │   ├── typography.ts   # Text styles & fonts
+    │   ├── radius.ts       # Border radius values
+    │   ├── shadows.ts      # Shadow/elevation styles
+    │   ├── animations.ts   # Animation timing
+    │   ├── icons.ts        # Icon sizes
+    │   ├── types.ts        # TypeScript definitions
+    │   └── index.ts        # Central export
+    │
     └── types/              # TypeScript type definitions
 ```
+
+## 🎨 Design System
+
+This project includes a **professional design system** - a collection of reusable design tokens that ensure consistency across your app!
+
+### What is a Design System?
+
+Instead of hardcoding values like `fontSize: 16` or `color: '#6200EE'` everywhere, you use semantic names like `body.regular` and `colors.primary`. This makes your code:
+- **Consistent**: All screens use the same values
+- **Maintainable**: Change once, updates everywhere
+- **Readable**: `colors.primary` is clearer than `'#6200EE'`
+- **Professional**: Industry-standard approach
+
+### Design Tokens Included
+
+| Category | File | What It Contains |
+|----------|------|------------------|
+| **Colors** | `colors.ts` | Brand colors, text colors, backgrounds, state colors (success/error/warning) |
+| **Spacing** | `spacing.ts` | 8-point grid system (4, 8, 12, 16, 24, 32, 48, 64px) |
+| **Typography** | `typography.ts` | Font sizes, weights, line heights, pre-styled text (headings, body, captions) |
+| **Radius** | `radius.ts` | Border radius values for rounded corners (buttons, cards, etc.) |
+| **Shadows** | `shadows.ts` | Elevation styles for iOS and Android (creates depth) |
+| **Animations** | `animations.ts` | Duration constants and easing curves for smooth transitions |
+| **Icons** | `icons.ts` | Standard icon sizes and touch target guidelines |
+
+### Quick Example
+
+**Before (hardcoded values):**
+```typescript
+const styles = StyleSheet.create({
+  button: {
+    backgroundColor: '#6200EE',     // ❌ What color is this?
+    padding: 20,                    // ❌ Why 20? Why not 16 or 24?
+    borderRadius: 12,               // ❌ Inconsistent across app
+    fontSize: 16,                   // ❌ Too many magic numbers!
+  }
+});
+```
+
+**After (using design system):**
+```typescript
+import { colors, spacing, radius, body } from '../theme';
+
+const styles = StyleSheet.create({
+  button: {
+    backgroundColor: colors.primary,  // ✅ Semantic & consistent
+    padding: spacing.lg,              // ✅ Part of 8pt grid
+    borderRadius: radius.md,          // ✅ Matches other components
+    ...body.regular,                  // ✅ Pre-styled text
+  }
+});
+```
+
+### How to Use the Design System
+
+**Import what you need:**
+```typescript
+import {
+  colors,      // Color palette
+  spacing,     // Spacing values
+  headings,    // Heading text styles
+  body,        // Body text styles
+  radius,      // Border radius
+  shadowSm,    // Small shadow
+} from '../theme';
+```
+
+**Use in your components:**
+```typescript
+<View style={{
+  backgroundColor: colors.surface,
+  padding: spacing.lg,
+  borderRadius: radius.md,
+  ...shadowSm,
+}}>
+  <Text style={[headings.h1, { color: colors.primary }]}>
+    Hello World!
+  </Text>
+</View>
+```
+
+### Learning the Design System
+
+Each theme file is **extensively documented** with:
+- What each value is for
+- When to use it
+- Why it exists
+- Real-world examples
+- Design principles explained
+
+**Start here:**
+1. Read `src/theme/colors.ts` - Learn about color systems
+2. Read `src/theme/spacing.ts` - Understand the 8-point grid
+3. Read `src/theme/typography.ts` - See how text hierarchy works
+4. Look at `src/screens/HomeScreen.tsx` - See it in action!
+5. Study `src/components/Button.tsx` - Reusable component example
+
+### Try This!
+
+1. Go to `src/theme/colors.ts`
+2. Change `primary: '#6200EE'` to `primary: '#FF5722'` (orange)
+3. Save and watch the app update instantly
+4. The header, button, and counter all change color automatically!
+5. **That's the power of a design system!** 🎉
+
+### Design System Benefits
+
+✅ **No more guessing** - Clear options for every value
+✅ **Consistent look** - All screens feel cohesive
+✅ **Easy to change** - Rebrand in minutes
+✅ **Type-safe** - TypeScript catches typos
+✅ **Self-documenting** - Code explains itself
+✅ **Professional** - Industry best practices
+✅ **Scalable** - Grow without chaos
 
 ## 🚀 Getting Started
 

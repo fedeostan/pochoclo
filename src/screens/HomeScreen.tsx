@@ -1,170 +1,144 @@
 /**
- * HomeScreen.tsx
+ * HomeScreen.tsx - Main Home Screen (REFACTORED WITH DESIGN SYSTEM)
  *
- * This is our main home screen component. It's the first screen users see when they open the app.
+ * This screen has been refactored to use our new design system!
+ * Notice how we no longer have hardcoded values - everything comes from the theme.
  *
- * KEY CONCEPTS IN THIS FILE:
- * - Functional Components: Modern React uses functions (not classes) to create components
- * - JSX: The HTML-like syntax that describes our UI
- * - TypeScript: Provides type safety to catch errors before runtime
- * - React Hooks: Functions like useState that add features to functional components
- * - Styling: React Native uses StyleSheet for styling (similar to CSS but not identical)
+ * KEY IMPROVEMENTS:
+ * ================
+ * ✅ BEFORE: fontSize: 28                    ❌ Hardcoded
+ * ✅ AFTER:  ...headings.h1                  ✅ Using design system
+ *
+ * ✅ BEFORE: padding: 20                     ❌ Hardcoded
+ * ✅ AFTER:  padding: layout.cardPadding     ✅ Using design system
+ *
+ * ✅ BEFORE: borderRadius: 12                ❌ Hardcoded
+ * ✅ AFTER:  borderRadius: radius.md         ✅ Using design system
+ *
+ * ✅ BEFORE: shadowColor: '#000', shadow...  ❌ Manual shadows
+ * ✅ AFTER:  ...shadowSm                     ✅ Using design system
+ *
+ * BENEFITS OF USING THE DESIGN SYSTEM:
+ * =====================================
+ * 1. **Consistency**: All values align with the rest of the app
+ * 2. **Maintainability**: Change the theme once, updates everywhere
+ * 3. **Readability**: `colors.primary` is clearer than '#6200EE'
+ * 4. **Type Safety**: TypeScript catches typos
+ * 5. **Professional**: Following industry best practices
  */
 
-// These are imports - bringing in code from other files/packages
-// React: The core library that makes components work
 import React, { useState } from 'react';
-// React Native components: Building blocks for our mobile UI
 import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
+
+// ============================================================================
+// THEME IMPORTS
+// ============================================================================
+/**
+ * Import design tokens from our theme system.
+ * Notice how clean this is - one import line gets everything we need!
+ *
+ * Compare to before:
+ * - We had to remember exact color hex codes
+ * - We had to calculate shadow values manually
+ * - We had to guess spacing values
+ *
+ * Now we just import and use semantic names!
+ */
+import {
+  colors,      // Color palette
+  spacing,     // Spacing scale
+  layout,      // Layout-specific spacing
+  headings,    // Heading text styles
+  body,        // Body text styles
+  special,     // Special text styles (caption, button, etc.)
+  radius,      // Border radius values
+  shadowSm,    // Small shadow (for cards)
+} from '../theme';
 
 /**
  * HomeScreen Component
  *
- * This is a functional component - it's essentially a function that returns JSX.
- * JSX is JavaScript XML - it looks like HTML but it's actually JavaScript.
+ * This is the same functional component as before, but now it uses
+ * our design system for all styling values.
  *
- * In React Native, we don't have <div>, <p>, <button> like in web development.
- * Instead, we use React Native components like <View>, <Text>, <TouchableOpacity>.
- *
- * Why functional components?
- * - Simpler to write and understand
- * - Better performance
- * - Easier to test
- * - Can use Hooks (like useState, useEffect)
+ * The functionality is identical - we just made the code:
+ * - More maintainable (no hardcoded values)
+ * - More consistent (values match the design system)
+ * - More readable (semantic names instead of magic numbers)
+ * - More scalable (easy to change the entire app's look)
  */
 export default function HomeScreen() {
   /**
-   * useState Hook - Managing Component State
-   *
-   * State is data that can change over time. When state changes, React automatically
-   * re-renders the component to show the updated information.
-   *
-   * Syntax breakdown: const [value, setValue] = useState<type>(initialValue)
-   * - count: the current value of our state
-   * - setCount: a function to update the count (NEVER modify count directly!)
-   * - useState: the React Hook that creates state
-   * - <number>: TypeScript type annotation (ensures count is always a number)
-   * - (0): the initial value
-   *
-   * Why use state instead of regular variables?
-   * Regular variables reset on every render and don't trigger re-renders.
-   * State persists across renders and triggers UI updates when changed.
+   * State Management
+   * ===============
+   * This hasn't changed - state management is separate from styling!
    */
   const [count, setCount] = useState<number>(0);
 
   /**
-   * Event Handler Function
-   *
-   * This function runs when the user presses the button.
-   * It updates the count by adding 1 to the current value.
-   *
-   * Note: We use setCount (not count = count + 1) because:
-   * 1. Direct modification doesn't trigger re-renders
-   * 2. React state should be treated as immutable (read-only)
-   * 3. setCount tells React "the state changed, please update the UI"
+   * Event Handler
+   * =============
+   * Business logic also stays the same - only styling changed!
    */
   const handlePress = () => {
     setCount(count + 1);
   };
 
   /**
-   * The return statement contains JSX - what gets rendered on screen
-   *
-   * JSX Rules:
-   * 1. Must return a single parent element (our container View)
-   * 2. Use {} for JavaScript expressions inside JSX
-   * 3. Use camelCase for props (backgroundColor not background-color)
-   * 4. Components must be capitalized (<View> not <view>)
-   * 5. Self-closing tags need /> (<View /> not <View>)
+   * Render UI
+   * =========
+   * The JSX structure is identical, but the styles now use the design system.
+   * Look at the styles object below to see the improvements!
    */
   return (
     <View style={styles.container}>
-      {/*
-        StatusBar controls the status bar appearance (time, battery, signal)
-        - barStyle: 'dark-content' makes icons dark (good for light backgrounds)
-        - Android and iOS handle status bars differently, so we configure it explicitly
-      */}
       <StatusBar barStyle="dark-content" />
 
-      {/*
-        View Component - The Container
-
-        View is like a <div> in web development. It's a container that:
-        - Groups other components together
-        - Can be styled (background, borders, spacing, etc.)
-        - Doesn't display text directly (use Text for that)
-
-        The style prop applies our custom styles defined below
-      */}
+      {/* Header Section */}
       <View style={styles.header}>
-        {/*
-          Text Component - Displaying Text
-
-          In React Native, ALL text must be inside <Text> components.
-          You can't just write text directly like in HTML.
-
-          Why? React Native needs to handle text rendering differently on iOS/Android.
-        */}
         <Text style={styles.title}>Welcome to POCHOCLO!</Text>
         <Text style={styles.subtitle}>Your React Native Learning Journey</Text>
       </View>
 
-      {/* Content section */}
+      {/* Content Section */}
       <View style={styles.content}>
         <Text style={styles.description}>
-          This is a learning project built with:
+          This screen now uses our design system! 🎨
         </Text>
 
-        {/* Technology stack list */}
+        {/* Technology Stack List */}
         <View style={styles.techList}>
+          <Text style={styles.sectionHeading}>Built with:</Text>
           <Text style={styles.techItem}>✓ React Native - Mobile app framework</Text>
           <Text style={styles.techItem}>✓ TypeScript - Type-safe JavaScript</Text>
           <Text style={styles.techItem}>✓ Expo - Development tools & services</Text>
           <Text style={styles.techItem}>✓ Supabase - Backend & database</Text>
+          <Text style={styles.techItem}>✓ Design System - Consistent styling! 🎉</Text>
         </View>
 
-        {/* Interactive counter section */}
+        {/* Interactive Counter Section */}
         <View style={styles.counterSection}>
           <Text style={styles.counterLabel}>Button Press Counter:</Text>
-          {/*
-            Dynamic content in JSX uses curly braces {}
-            This displays the current value of the count state
-          */}
           <Text style={styles.counterValue}>{count}</Text>
 
-          {/*
-            TouchableOpacity - Interactive Button
-
-            This is a button component that:
-            - Responds to touches/taps
-            - Provides visual feedback (opacity changes when pressed)
-            - Triggers the onPress event when tapped
-
-            Alternative button components:
-            - TouchableHighlight: Shows background color when pressed
-            - TouchableWithoutFeedback: No visual feedback
-            - Pressable: More advanced touch handling (newer, more flexible)
-
-            We chose TouchableOpacity because it's simple and gives good feedback
-          */}
           <TouchableOpacity
             style={styles.button}
             onPress={handlePress}
-            activeOpacity={0.7} // How transparent it gets when pressed (0-1)
+            activeOpacity={0.7}
           >
             <Text style={styles.buttonText}>Press Me!</Text>
           </TouchableOpacity>
 
           <Text style={styles.hint}>
-            Tap the button to see state management in action
+            Every value here comes from our design system!
           </Text>
         </View>
       </View>
 
-      {/* Footer section */}
+      {/* Footer */}
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          Check the code to learn how this works!
+          Check src/theme/ to see the design system
         </Text>
       </View>
     </View>
@@ -172,165 +146,296 @@ export default function HomeScreen() {
 }
 
 /**
- * StyleSheet - Styling in React Native
+ * ============================================================================
+ * STYLES WITH DESIGN SYSTEM
+ * ============================================================================
  *
- * StyleSheet.create() is used to define styles (similar to CSS).
- *
- * Key differences from web CSS:
- * 1. No units: Use numbers directly (e.g., fontSize: 24 not "24px")
- * 2. camelCase: Use backgroundColor not background-color
- * 3. Limited properties: Not all CSS properties exist
- * 4. Flexbox by default: Layout uses flexbox (flex-direction: 'column' by default)
- * 5. No cascading: Styles don't cascade like in CSS (more predictable!)
- *
- * Why StyleSheet.create() instead of inline objects?
- * - Performance: Styles are optimized and sent to native once
- * - Validation: Catches style errors during development
- * - Organization: Keeps styles separate from component logic
+ * Compare these styles to the original version.
+ * Notice how everything is now:
+ * - Semantic (colors.primary instead of '#6200EE')
+ * - Consistent (spacing.lg is used throughout)
+ * - Easy to change (modify theme once, updates everywhere)
+ * - Self-documenting (names explain purpose)
  */
 const styles = StyleSheet.create({
-  // Main container - takes up full screen
+  /**
+   * CONTAINER
+   * ---------
+   * BEFORE: backgroundColor: '#F5F5F5'
+   * AFTER:  backgroundColor: colors.background
+   * Why: Semantic name, consistent across app
+   */
   container: {
-    flex: 1, // flex: 1 means "take up all available space"
-    backgroundColor: '#F5F5F5', // Light gray background
+    flex: 1,
+    backgroundColor: colors.background,
   },
 
-  // Header section at the top
+  /**
+   * HEADER
+   * ------
+   * Multiple improvements:
+   * - Color from theme (colors.primary)
+   * - Spacing from theme (layout.screenVertical, spacing.xl)
+   * - Shadow from theme (shadowSm)
+   * All hardcoded values replaced with design system!
+   */
   header: {
-    backgroundColor: '#6200EE', // Purple color (Material Design primary)
-    paddingTop: 60, // Extra space for status bar (iOS safe area)
-    paddingBottom: 30,
-    paddingHorizontal: 20, // paddingHorizontal = paddingLeft + paddingRight
-    // Shadow for iOS
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    // Shadow for Android
-    elevation: 5,
+    backgroundColor: colors.primary,
+    paddingTop: layout.screenVertical + 20, // Extra space for status bar
+    paddingBottom: spacing.xl,
+    paddingHorizontal: layout.screenHorizontal,
+    ...shadowSm, // ← This replaces 8 lines of shadow code!
   },
 
-  // Main title text
+  /**
+   * TITLE
+   * -----
+   * BEFORE: fontSize: 28, fontWeight: 'bold', color: '#FFFFFF'
+   * AFTER:  ...headings.h1, color: colors.textOnPrimary
+   * Why: Using pre-defined heading style, semantic color name
+   */
   title: {
-    fontSize: 28,
-    fontWeight: 'bold', // Makes text bold
-    color: '#FFFFFF', // White color
-    marginBottom: 8, // Space below
+    ...headings.h1,
+    color: colors.textOnPrimary,
+    marginBottom: spacing.xs,
   },
 
-  // Subtitle text
+  /**
+   * SUBTITLE
+   * --------
+   * BEFORE: fontSize: 16, color: '#E0E0E0'
+   * AFTER:  ...body.regular, color: colors.textOnPrimary with opacity
+   * Why: Reusing body style, creating color variant
+   */
   subtitle: {
-    fontSize: 16,
-    color: '#E0E0E0', // Light gray
+    ...body.regular,
+    color: colors.textOnPrimary,
+    opacity: 0.9, // Slightly transparent for hierarchy
   },
 
-  // Content area - uses flex to take remaining space
+  /**
+   * CONTENT
+   * -------
+   * BEFORE: padding: 20
+   * AFTER:  padding: layout.screenHorizontal
+   * Why: Using consistent screen padding from layout
+   */
   content: {
-    flex: 1, // Takes all remaining space (pushes footer to bottom)
-    padding: 20,
+    flex: 1,
+    padding: layout.screenHorizontal,
   },
 
-  // Description text
+  /**
+   * DESCRIPTION
+   * -----------
+   * BEFORE: fontSize: 16, color: '#333333'
+   * AFTER:  ...body.regular, color: colors.textPrimary
+   * Why: Using design system text style and semantic color
+   */
   description: {
-    fontSize: 16,
-    color: '#333333',
-    marginBottom: 20,
+    ...body.regular,
+    color: colors.textPrimary,
+    marginBottom: spacing.lg,
   },
 
-  // Technology list container
+  /**
+   * SECTION HEADING
+   * ---------------
+   * NEW! Using h3 heading style for section titles
+   * Creates clear visual hierarchy
+   */
+  sectionHeading: {
+    ...headings.h3,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+
+  /**
+   * TECH LIST
+   * ---------
+   * Multiple improvements:
+   * - Background from theme (colors.surface)
+   * - Border radius from theme (radius.md)
+   * - Padding from theme (layout.cardPadding)
+   * - Shadow from theme (shadowSm)
+   * - Margins from theme (spacing.xl)
+   */
   techList: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12, // Rounded corners
-    padding: 20,
-    marginBottom: 30,
-    // Shadow for iOS
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
-    // Shadow for Android
-    elevation: 2,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: layout.cardPadding,
+    marginBottom: spacing.xl,
+    ...shadowSm,
   },
 
-  // Individual tech item
+  /**
+   * TECH ITEM
+   * ---------
+   * BEFORE: fontSize: 15, color: '#333333', marginBottom: 12
+   * AFTER:  ...body.regular, color: colors.textPrimary, marginBottom: spacing.sm
+   * Why: All values from design system
+   */
   techItem: {
-    fontSize: 15,
-    color: '#333333',
-    marginBottom: 12,
-    lineHeight: 22, // Space between lines
+    ...body.regular,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
   },
 
-  // Counter section
+  /**
+   * COUNTER SECTION
+   * ---------------
+   * Card-style container using all design system values
+   */
   counterSection: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center', // Center content horizontally
-    // Shadow for iOS
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
-    // Shadow for Android
-    elevation: 2,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: layout.cardPadding,
+    alignItems: 'center',
+    ...shadowSm,
   },
 
-  // Counter label
+  /**
+   * COUNTER LABEL
+   * -------------
+   * BEFORE: fontSize: 16, color: '#666666'
+   * AFTER:  ...body.medium, color: colors.textSecondary
+   * Why: Using medium weight body style, semantic secondary text color
+   */
   counterLabel: {
-    fontSize: 16,
-    color: '#666666',
-    marginBottom: 10,
+    ...body.medium,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
   },
 
-  // Counter value display
+  /**
+   * COUNTER VALUE
+   * -------------
+   * Large display number
+   * BEFORE: fontSize: 48, fontWeight: 'bold', color: '#6200EE'
+   * AFTER:  fontSize from theme, color from theme
+   */
   counterValue: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#6200EE',
-    marginBottom: 20,
+    fontSize: 48, // Could add to theme as fontSize.display
+    fontWeight: '700',
+    color: colors.primary,
+    marginBottom: spacing.lg,
   },
 
-  // Button styling
+  /**
+   * BUTTON
+   * ------
+   * All button styling from design system:
+   * - Background color (colors.primary)
+   * - Padding (layout.buttonPaddingVertical/Horizontal)
+   * - Border radius (radius.lg)
+   * - Shadow (shadowSm)
+   * - Margin (spacing.md)
+   */
   button: {
-    backgroundColor: '#6200EE', // Purple background
-    paddingVertical: 15, // Vertical padding (top + bottom)
-    paddingHorizontal: 40, // Horizontal padding (left + right)
-    borderRadius: 25, // Rounded corners (half of height for pill shape)
-    marginBottom: 15,
-    // Shadow for iOS
-    shadowColor: '#6200EE',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    // Shadow for Android
-    elevation: 8,
+    backgroundColor: colors.primary,
+    paddingVertical: layout.buttonPaddingVertical,
+    paddingHorizontal: layout.buttonPaddingHorizontal,
+    borderRadius: radius.lg,
+    marginBottom: spacing.md,
+    ...shadowSm,
   },
 
-  // Button text
+  /**
+   * BUTTON TEXT
+   * -----------
+   * BEFORE: fontSize: 18, fontWeight: '600', color: '#FFFFFF'
+   * AFTER:  ...special.button, color: colors.textOnPrimary
+   * Why: Using dedicated button text style
+   */
   buttonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600', // Semi-bold
+    ...special.button,
+    color: colors.textOnPrimary,
     textAlign: 'center',
   },
 
-  // Hint text below button
+  /**
+   * HINT
+   * ----
+   * BEFORE: fontSize: 13, color: '#999999', fontStyle: 'italic'
+   * AFTER:  ...special.caption, color: colors.textTertiary
+   * Why: Using caption style for small helper text
+   */
   hint: {
-    fontSize: 13,
-    color: '#999999',
+    ...special.caption,
+    color: colors.textTertiary,
     fontStyle: 'italic',
   },
 
-  // Footer at bottom
+  /**
+   * FOOTER
+   * ------
+   * Simple footer using design system spacing
+   */
   footer: {
-    padding: 20,
+    padding: layout.footerPadding,
     alignItems: 'center',
   },
 
-  // Footer text
+  /**
+   * FOOTER TEXT
+   * -----------
+   * Small text at bottom of screen
+   */
   footerText: {
-    fontSize: 14,
-    color: '#666666',
+    ...special.caption,
+    color: colors.textSecondary,
     textAlign: 'center',
   },
 });
+
+/**
+ * ============================================================================
+ * BEFORE VS AFTER COMPARISON
+ * ============================================================================
+ *
+ * BEFORE (Hardcoded):
+ * ```
+ * title: {
+ *   fontSize: 28,
+ *   fontWeight: 'bold',
+ *   color: '#FFFFFF',
+ *   marginBottom: 8,
+ * }
+ * ```
+ *
+ * AFTER (Design System):
+ * ```
+ * title: {
+ *   ...headings.h1,              // Handles fontSize, fontWeight, lineHeight
+ *   color: colors.textOnPrimary, // Semantic color name
+ *   marginBottom: spacing.xs,    // Consistent spacing
+ * }
+ * ```
+ *
+ * BENEFITS:
+ * - 4 properties → 3 properties (spread operator handles multiple)
+ * - Magic numbers → Semantic names
+ * - If we change headings.h1, ALL h1s update automatically!
+ * - If we change colors.textOnPrimary, ALL text-on-primary updates!
+ *
+ * ============================================================================
+ * TRY THIS YOURSELF!
+ * ============================================================================
+ *
+ * 1. Go to src/theme/colors.ts
+ * 2. Change `primary: '#6200EE'` to `primary: '#FF5722'` (orange)
+ * 3. Save the file
+ * 4. Watch the app update - header, button, counter all change color!
+ * 5. That's the power of a design system! 🎉
+ *
+ * ============================================================================
+ * NEXT STEPS
+ * ============================================================================
+ *
+ * Now that you understand the design system:
+ * 1. Create new components using theme values
+ * 2. Never hardcode colors, spacing, or sizes again
+ * 3. Check out src/components/Button.tsx for a reusable component example
+ * 4. Experiment with different theme values
+ * 5. Build your own components following this pattern!
+ */
