@@ -70,51 +70,78 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * For development, we're using environment variables (best practice).
  * The fallback values are your actual Firebase config for convenience.
  */
+/**
+ * Validate required environment variables
+ *
+ * This ensures that the app won't run without proper configuration.
+ * You must create a .env file with your Firebase credentials.
+ * Copy .env.example to .env and fill in your values from Firebase Console.
+ */
+const requiredEnvVars = [
+  'EXPO_PUBLIC_FIREBASE_API_KEY',
+  'EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN',
+  'EXPO_PUBLIC_FIREBASE_PROJECT_ID',
+  'EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET',
+  'EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
+  'EXPO_PUBLIC_FIREBASE_APP_ID',
+] as const;
+
+// Check for missing environment variables in development
+const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
+if (missingVars.length > 0) {
+  console.error(
+    '⚠️ Missing Firebase environment variables:\n' +
+      missingVars.map((v) => `  - ${v}`).join('\n') +
+      '\n\nPlease create a .env file with your Firebase credentials.\n' +
+      'Copy .env.example to .env and fill in your values from Firebase Console.'
+  );
+}
+
 const firebaseConfig = {
   /**
    * API Key - Identifies your project to Firebase services
    * This is NOT a secret - it's safe to include in client code
    * Security comes from Firebase Security Rules, not hiding this key
    */
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || 'AIzaSyCoMk2V7oJXoDiJ9jkRM8d_kuKTeRhYALw',
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
 
   /**
    * Auth Domain - The domain used for Firebase Auth operations
    * Used for sign-in popups and redirects on web
    * Format: your-project-id.firebaseapp.com
    */
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || 'pochoclo-f8d6c.firebaseapp.com',
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
 
   /**
    * Project ID - Unique identifier for your Firebase project
    * Used by all Firebase services to know which project to use
    */
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || 'pochoclo-f8d6c',
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
 
   /**
    * Storage Bucket - Where files are stored (Firebase Storage)
    * We'll use this later for uploading images, documents, etc.
    * Format: your-project-id.appspot.com (or .firebasestorage.app for newer projects)
    */
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || 'pochoclo-f8d6c.firebasestorage.app',
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
 
   /**
    * Messaging Sender ID - For Firebase Cloud Messaging (push notifications)
    * We'll use this later if we add push notifications
    */
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '864407413940',
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
 
   /**
    * App ID - Unique identifier for this specific app in your project
    * A Firebase project can have multiple apps (iOS, Android, Web)
    */
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || '1:864407413940:web:168f0e70f88f2c8f5563e1',
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 
   /**
    * Measurement ID - For Google Analytics (optional)
    * Used to track app usage and user behavior
    */
-  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID || 'G-6P96VLB3FW',
+  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 /**

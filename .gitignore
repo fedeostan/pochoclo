@@ -37,6 +37,11 @@ yarn-error.*
 .env.development
 .env.production
 
+# Firebase config files (contain API keys - download fresh from Firebase Console)
+app/GoogleService-Info.plist
+app/google-services.json
+firebase-debug.log
+
 # typescript
 *.tsbuildinfo
 
