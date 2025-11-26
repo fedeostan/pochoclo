@@ -1,7 +1,7 @@
 # Claude AI Assistant Rules for POCHOCLO Learning Project
 
 ## Project Overview
-This is a **learning project** focused on React Native mobile development with Expo, TypeScript, and Supabase. The primary goal is educational - helping the developer understand fundamental concepts, best practices, and the "why" behind code decisions.
+This is a **learning project** focused on React Native mobile development with Expo, TypeScript, and Firebase. The primary goal is educational - helping the developer understand fundamental concepts, best practices, and the "why" behind code decisions.
 
 ## Core Principles
 
@@ -92,14 +92,15 @@ Always explain:
 - **Styling**: How React Native styles differ from CSS
 - **Platform differences**: iOS vs Android considerations
 
-### 8. Supabase Learning Integration
+### 8. Firebase Learning Integration
 
-When working with Supabase:
-- Explain database concepts (tables, queries, relationships)
+When working with Firebase:
+- Explain Firebase services (Auth, Firestore, Storage)
 - Show why we separate configuration from code
 - Teach about environment variables and security
-- Explain async/await patterns for database calls
-- Demonstrate error handling best practices
+- Explain async/await patterns for Firebase calls
+- Demonstrate error handling with Firebase error codes
+- Compare Firebase patterns to alternatives (like Supabase)
 
 ### 9. Progressive Complexity
 
@@ -145,7 +146,59 @@ When explaining code or concepts:
 - **React Native**: Framework for building mobile apps with React
 - **TypeScript**: JavaScript with type safety
 - **Expo**: Tooling and services for React Native development
-- **Supabase**: Backend-as-a-Service (database, auth, storage)
+- **Firebase**: Backend-as-a-Service (Authentication, Firestore database, Storage)
+- **NativeWind**: Tailwind CSS for React Native styling
+- **Tailwind CSS**: Utility-first CSS framework
+
+## UI Design System
+
+**IMPORTANT**: All UI must follow the design system defined in `UI_RULES.md`.
+
+### Quick Reference
+
+**Colors**
+- Background: `bg-background` (#FAFAF9 - warm off-white)
+- Primary: `bg-primary` / `text-primary` (#6B8E7B - soft sage green)
+- Text: `text-foreground` (#1C1917 - dark gray)
+- Muted: `text-muted-foreground` (#78716C)
+
+**Core Principles**
+- MINIMAL: No unnecessary elements, embrace whitespace
+- LIGHT: Light theme only, off-white backgrounds
+- SOFT: Muted colors, no harsh/vibrant tones
+- MODERN: Rounded corners (12px), clean typography
+
+**Always Use UI Components**
+```tsx
+import { Button, Input, Text, Card } from "@/components/ui";
+
+// NOT React Native primitives directly for styled elements
+```
+
+**Spacing**: Use Tailwind scale (p-4, gap-4, m-6)
+**Corners**: Use `rounded-lg` (12px) for most elements
+**Typography**: Use `<Text variant="...">` for all text
+
+See `UI_RULES.md` for complete documentation.
+
+## Available MCP Tools
+
+### Firebase MCP
+For any Firebase-related tasks, **always use the Firebase MCP tools** instead of manual CLI commands or direct API calls. The Firebase MCP provides direct integration with:
+- **Project management**: Create projects, list projects, get project info
+- **App management**: Create and list Firebase apps (iOS, Android, Web)
+- **Authentication**: Login/logout, environment configuration
+- **Initialization**: Set up Firebase services (Firestore, Realtime Database, Hosting, Storage, Data Connect)
+- **Security Rules**: Get and manage security rules for Firestore, RTDB, and Storage
+- **Edge Functions**: Deploy and manage edge functions
+- **SDK Configuration**: Retrieve SDK configs for different platforms
+
+When to use Firebase MCP:
+- Setting up a new Firebase project
+- Configuring Firebase services
+- Getting SDK configuration for the app
+- Managing Firebase apps and settings
+- Checking environment and authentication status
 
 ## Remember
 

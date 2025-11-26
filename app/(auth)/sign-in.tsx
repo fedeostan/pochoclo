@@ -2,50 +2,51 @@
  * Sign In Screen
  *
  * This screen allows existing users to log into their accounts using
- * email and password authentication through Supabase.
+ * email and password authentication through Firebase Auth.
  *
  * PURPOSE:
  * The Sign In screen handles:
  * 1. Email and password input with validation
- * 2. Form submission to Supabase Auth
+ * 2. Form submission to Firebase Auth (via Redux)
  * 3. Error handling and user feedback
  * 4. Loading states during authentication
  * 5. Navigation to other auth screens (sign-up, password recovery)
  *
- * USER FLOW:
- * 1. User enters email and password
- * 2. User taps "Sign In" button
- * 3. App validates input (client-side)
- * 4. App sends credentials to Supabase (server-side)
- * 5. On success: Navigate to home screen (handled by auth state)
- * 6. On error: Show error message, let user retry
+ * DESIGN SYSTEM:
+ * Uses our NativeWind/Tailwind-based UI components:
+ * - Text component with variants (h1, body, muted)
+ * - Button component with variants and loading states
+ * - Input component with labels and error states
+ * - Tailwind classes for layout and spacing
  *
- * AUTHENTICATION ARCHITECTURE:
- * This screen uses AuthContext (from Phase 4) which:
- * - Manages authentication state
- * - Provides signIn() function
- * - Handles Supabase integration
- * - Automatically updates app-wide auth state on success
+ * Follows UI_RULES.md principles:
+ * - Minimal: Clean form with purposeful whitespace
+ * - Light: Off-white background (#FAFAF9)
+ * - Soft: Muted sage green accent (#6B8E7B)
+ * - Modern: Rounded inputs, clean typography
+ *
+ * UX IMPROVEMENTS:
+ * - Button and footer stay at bottom of screen (closer to thumb)
+ * - Button moves up with keyboard for easy access after typing
+ * - Button is disabled until form is valid (prevents premature submission)
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
-  Text,
-  StyleSheet,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   Pressable,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { router } from 'expo-router';
-import { colors, spacing, headings, body } from '../../src/theme';
-import Button from '../../src/components/Button';
-import TextInput from '../../src/components/TextInput';
-import PasswordInput from '../../src/components/PasswordInput';
-import FormErrorMessage from '../../src/components/FormErrorMessage';
-import { useAuth } from '../../src/context/AuthContext';
-import { validateEmail } from '../../src/utils/validation';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Text, Button, Input, NavBar, useNavBarHeight } from '@/components/ui';
+import { useAppDispatch, useAppSelector } from '@/store';
+import { signIn, clearError } from '@/store/slices/authSlice';
+import { validateEmail } from '@/utils/validation';
 
 /**
  * SignInScreen Component
@@ -55,537 +56,434 @@ import { validateEmail } from '../../src/utils/validation';
  * STATE MANAGEMENT:
  * Uses local state (useState) for:
  * - Form field values (email, password)
- * - Validation errors
- * - Loading state
+ * - Client-side validation errors
  *
- * Uses context (useAuth) for:
- * - Authentication functions (signIn)
- * - Global auth state
+ * Uses Redux (useAppSelector/useAppDispatch) for:
+ * - Authentication state (loading, error from server)
+ * - Dispatching signIn action
  *
- * WHY LOCAL STATE FOR FORMS?
- * Form inputs change frequently (every keystroke), and only this
- * component needs to know about them. Using local state:
- * - Prevents unnecessary re-renders in other components
- * - Keeps form logic encapsulated
- * - Makes the component easier to test and reason about
+ * WHY SPLIT STATE THIS WAY?
+ * Local state for form inputs (changes frequently, only needed here).
+ * Redux for auth state (comes from async thunk, shared across app).
  */
 export default function SignInScreen() {
-  // Get signIn function from AuthContext
-  // This function handles all Supabase authentication logic
-  const { signIn } = useAuth();
+  /**
+   * Redux Hooks
+   *
+   * useAppDispatch: Returns the dispatch function for sending actions
+   * useAppSelector: Reads specific state from the Redux store
+   */
+  const dispatch = useAppDispatch();
+  const { loading, error: authError } = useAppSelector((state) => state.auth);
 
-  // Form field state
-  // Each input field needs its own state to track user input
+  /**
+   * NavBar Height
+   *
+   * Get the total height of the NavBar (including safe area inset).
+   * We use this to add paddingTop to the ScrollView content so it
+   * doesn't start hidden behind the fixed NavBar.
+   */
+  const navBarHeight = useNavBarHeight();
+
+  /**
+   * Local Form State
+   *
+   * Form inputs kept in local state:
+   * - They change frequently (every keystroke)
+   * - Only this component needs them
+   */
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [validationError, setValidationError] = useState('');
 
-  // Error state
-  // Stores validation or authentication errors to show to the user
-  const [error, setError] = useState('');
+  /**
+   * Scroll State for NavBar Border
+   *
+   * Tracks whether the user has scrolled down from the top.
+   * When true, the NavBar shows a subtle bottom border to indicate
+   * that content is scrolling behind it.
+   *
+   * This is a polished UX detail seen in native iOS/Android apps.
+   */
+  const [isScrolled, setIsScrolled] = useState(false);
 
-  // Loading state
-  // Shows loading indicator while authentication request is in progress
-  // Prevents user from submitting form multiple times
-  const [isLoading, setIsLoading] = useState(false);
+  /**
+   * Scroll Event Handler
+   *
+   * Called whenever the ScrollView is scrolled.
+   * Updates isScrolled state based on the scroll position.
+   *
+   * WHY useCallback?
+   * - Memoizes the function to prevent unnecessary re-renders
+   * - The function reference stays stable across renders
+   * - Required for optimal performance with onScroll events
+   *
+   * SCROLL THRESHOLD:
+   * We consider content "scrolled" when scrollY > 0.
+   * This means even 1 pixel of scroll triggers the border.
+   * You could use a larger threshold (e.g., 10) for a delay effect.
+   */
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const scrollY = event.nativeEvent.contentOffset.y;
+      setIsScrolled(scrollY > 0);
+    },
+    []
+  );
+
+  /**
+   * Clear Auth Error on Mount and Unmount
+   *
+   * Prevents showing stale errors from previous sign-in attempts.
+   */
+  useEffect(() => {
+    dispatch(clearError());
+    return () => {
+      dispatch(clearError());
+    };
+  }, [dispatch]);
+
+  /**
+   * Form Validation State
+   *
+   * Computed value that determines if the form is ready for submission.
+   * The button will be disabled until this returns true.
+   *
+   * WHY REAL-TIME VALIDATION?
+   * - Better UX: User knows when form is ready
+   * - Prevents unnecessary error messages from premature submissions
+   * - Button becomes "active" as visual feedback when form is complete
+   *
+   * VALIDATION RULES:
+   * 1. Email must be valid format (checked by validateEmail returning undefined)
+   * 2. Password must be at least 6 characters (Firebase minimum)
+   */
+  const isFormValid = !validateEmail(email) && password.length >= 6;
 
   /**
    * Form Submission Handler
    *
-   * This function is called when the user taps the "Sign In" button.
-   * It handles the entire authentication flow:
+   * FLOW:
    * 1. Clear previous errors
-   * 2. Validate input (client-side)
-   * 3. Call signIn from AuthContext
-   * 4. Handle success or failure
+   * 2. Validate input (client-side) - extra safety check
+   * 3. Dispatch signIn thunk to Redux
+   * 4. Wait for result using unwrap()
+   * 5. On success: Navigate to /home explicitly
+   * 6. On failure: Error is set in Redux, displayed automatically
    *
-   * ASYNC/AWAIT EXPLAINED:
-   * Authentication involves network requests, which take time.
-   * async/await lets us write asynchronous code that looks synchronous:
+   * WHY EXPLICIT NAVIGATION?
+   * The Redirect component in index.tsx only evaluates on initial render.
+   * It doesn't re-trigger when Redux state changes mid-session.
+   * So we explicitly navigate after successful sign-in.
    *
-   * Without async/await:
-   * signIn(email, password).then(result => {
-   *   // handle success
-   * }).catch(error => {
-   *   // handle error
-   * });
-   *
-   * With async/await (cleaner, more readable):
-   * try {
-   *   await signIn(email, password);
-   *   // handle success
-   * } catch (error) {
-   *   // handle error
-   * }
+   * NOTE: With isFormValid preventing premature submission,
+   * these validation checks are mostly redundant but kept as a safety net.
    */
   const handleSignIn = async () => {
-    // Clear any previous error messages
-    setError('');
+    setValidationError('');
+    dispatch(clearError());
 
-    /**
-     * CLIENT-SIDE VALIDATION
-     *
-     * Before sending data to the server, validate it locally.
-     * This provides instant feedback to users and reduces unnecessary
-     * network requests.
-     *
-     * Why validate on client AND server?
-     * - Client: Fast feedback, better UX
-     * - Server: Security (never trust client), data integrity
-     */
-
-    // Validate email format
-    if (!validateEmail(email)) {
-      setError('Please enter a valid email address');
-      return; // Stop here, don't proceed with sign in
+    // Validate email format (safety check - button should already be disabled if invalid)
+    const emailError = validateEmail(email);
+    if (emailError) {
+      setValidationError(emailError);
+      return;
     }
 
-    // Validate password (basic check)
+    // Validate password length (safety check)
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setValidationError('Password must be at least 6 characters');
       return;
     }
 
     /**
-     * AUTHENTICATION REQUEST
+     * Dispatch sign in action and wait for result
      *
-     * Now we call the signIn function from AuthContext.
-     * This function:
-     * 1. Sends credentials to Supabase
-     * 2. Receives authentication token
-     * 3. Updates global auth state
-     * 4. Triggers navigation to home screen (via auth state change)
+     * unwrap() is a Redux Toolkit method that:
+     * - Returns the fulfilled value if successful
+     * - Throws the rejected value if failed
+     *
+     * This lets us use try/catch to handle success/failure.
+     * On success, we navigate to /home.
+     * On failure, Redux already set the error, so we don't need to do anything.
      */
-
     try {
-      // Start loading state (shows spinner, disables button)
-      setIsLoading(true);
-
-      // Call signIn from AuthContext (async operation)
-      // This will throw an error if authentication fails
-      await signIn(email, password);
-
-      /**
-       * SUCCESS HANDLING
-       *
-       * If we reach this point, sign in was successful.
-       * The AuthContext will automatically update the auth state,
-       * which triggers navigation to the home screen.
-       *
-       * We don't need to manually navigate here because:
-       * 1. AuthContext updates user state
-       * 2. Root layout detects auth state change
-       * 3. Root layout automatically shows home screen
-       *
-       * This is called "declarative navigation" - navigation happens
-       * based on state, not imperative commands.
-       */
-
-      // Navigation is handled by auth state change, nothing to do here
-
-    } catch (err) {
-      /**
-       * ERROR HANDLING
-       *
-       * If signIn throws an error, we catch it here and show it to the user.
-       *
-       * Common errors:
-       * - Invalid email/password
-       * - Network error (no internet)
-       * - Server error (Supabase down)
-       * - Account not confirmed (email verification pending)
-       */
-
-      // Extract error message from error object
-      // err is any type, so we need to safely access the message
-      const errorMessage =
-        err instanceof Error ? err.message : 'An error occurred during sign in';
-
-      // Update error state to show message to user
-      setError(errorMessage);
-
-    } finally {
-      /**
-       * FINALLY BLOCK
-       *
-       * Code in 'finally' runs whether the try succeeds or fails.
-       * Perfect for cleanup operations that should always happen.
-       *
-       * Here, we always want to stop the loading state, regardless
-       * of whether sign in succeeded or failed.
-       */
-      setIsLoading(false);
+      await dispatch(signIn({ email, password })).unwrap();
+      // Success! Navigate to home screen
+      router.replace('/home');
+    } catch {
+      // Error is already set in Redux state by the rejected action
+      // The UI will display it automatically via authError
     }
   };
 
   /**
-   * Navigation Handler: Go Back
-   *
-   * Returns to the previous screen (Welcome screen).
-   * Uses router.back() which pops the current screen off the stack.
+   * Navigation Handlers
    */
-  const handleGoBack = () => {
-    router.back();
-  };
+  const handleForgotPassword = () => router.push('/forgot-password');
+  const handleCreateAccount = () => router.push('/sign-up');
+
+  // Determine which error to show (validation takes priority)
+  const displayError = validationError || authError;
 
   /**
-   * Navigation Handler: Forgot Password
+   * Safe Area Insets
    *
-   * This will navigate to the password recovery screen in Phase 7.
-   * For now, it's a placeholder.
-   */
-  const handleForgotPassword = () => {
-    // TODO: Phase 7 - Navigate to forgot-password screen
-    router.push('/forgot-password');
-  };
-
-  /**
-   * Navigation Handler: Create Account
+   * Instead of using SafeAreaView with edges={['top']}, we use the View
+   * with only bottom edge protection. This removes the invisible header
+   * at the top while still protecting content from the bottom home indicator.
    *
-   * Navigates to the sign-up screen (Phase 6).
+   * The top safe area (notch/status bar) is handled by the content padding.
    */
-  const handleCreateAccount = () => {
-    // TODO: Phase 6 - Navigate to sign-up screen
-    router.push('/sign-up');
-  };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={0}
-    >
-      {/*
-        ScrollView for Content
+    <SafeAreaView className="flex-1 bg-background" edges={['bottom']}>
+      {/**
+       * Fixed Navigation Bar
+       *
+       * The NavBar component is positioned absolutely at the top of the screen.
+       * It stays fixed while the ScrollView content scrolls behind it.
+       *
+       * HOW IT WORKS:
+       * 1. NavBar uses position: absolute + zIndex: 100
+       * 2. NavBar extends from top of screen (including status bar area)
+       * 3. NavBar background matches app background (#FAFAF9)
+       * 4. ScrollView content has paddingTop to start below the NavBar
+       * 5. When user scrolls, content passes "behind" the NavBar and is hidden
+       *
+       * This creates a native, polished feel where the navigation stays
+       * accessible while scrolling through content.
+       */}
+      <NavBar showBackButton isScrolled={isScrolled} />
 
-        Wraps content in a scrollable view so:
-        1. Users can scroll if keyboard covers inputs
-        2. Content is accessible on small screens
-        3. Form is usable regardless of keyboard state
-
-        KEYBOARD HANDLING STRATEGY:
-        - KeyboardAvoidingView: Pushes content up when keyboard appears
-        - ScrollView: Allows scrolling to see all content
-        - TouchableWithoutFeedback (in layout): Dismisses keyboard on tap outside
-
-        This combination ensures form is always usable.
-      */}
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+      {/**
+       * KeyboardAvoidingView Configuration
+       *
+       * This wraps the entire screen content and adjusts when keyboard appears.
+       *
+       * behavior="padding" (both platforms):
+       * - Adds padding to push content up when keyboard opens
+       * - Works reliably on both iOS and Android
+       * - "height" behavior had issues on Android with Expo's edge-to-edge mode
+       *
+       * keyboardVerticalOffset:
+       * - iOS: 0 (no extra offset needed)
+       * - Android: 20 (compensates for different keyboard height calculation)
+       *
+       * By having the button OUTSIDE the ScrollView but INSIDE KeyboardAvoidingView,
+       * the button will move up when the keyboard appears - making it easily
+       * accessible with your thumb right after typing.
+       */}
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 20}
       >
-        {/*
-          Header Section
+        {/**
+         * Scrollable Content Area
+         *
+         * Contains the header, form fields, and error message.
+         * Uses flex-1 to take remaining space above the fixed bottom section.
+         *
+         * WHY SCROLLVIEW?
+         * - Handles overflow when keyboard is open
+         * - Allows users to scroll to see all content
+         * - keyboardShouldPersistTaps="handled" prevents keyboard dismissal on tap
+         *
+         * PADDING TOP:
+         * We add paddingTop equal to the NavBar height so content starts
+         * below the fixed NavBar. Without this, the first content would
+         * be hidden behind the NavBar.
+         */}
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ flexGrow: 1, paddingTop: navBarHeight }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+        >
+          <View className="flex-1 px-6 py-4">
+            {/**
+             * Header Section
+             *
+             * Title and subtitle for the screen.
+             * The back button is now in the fixed NavBar above.
+             */}
+            <View className="mb-8">
+              {/* Screen Title */}
+              <Text variant="h1" className="mb-2">
+                Welcome Back
+              </Text>
+              <Text variant="lead">
+                Sign in to continue your journey
+              </Text>
+            </View>
 
-          Back button and screen title.
-          Consistent header pattern across auth screens.
-        */}
-        <View style={styles.header}>
-          {/* Back Button */}
-          <Pressable onPress={handleGoBack} style={styles.backButton}>
-            <Text style={styles.backButtonText}>← Back</Text>
-          </Pressable>
+            {/**
+             * Form Section
+             *
+             * Email and password inputs using our Input component.
+             * gap-4 provides consistent 16px spacing between fields.
+             */}
+            <View className="gap-4">
+              {/* Email Input */}
+              <Input
+                label="Email"
+                placeholder="your.email@example.com"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!loading}
+              />
 
-          {/* Screen Title */}
-          <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.subtitle}>Sign in to continue your journey</Text>
-        </View>
+              {/* Password Input */}
+              <Input
+                label="Password"
+                placeholder="Enter your password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                onSubmitEditing={handleSignIn}
+                editable={!loading}
+              />
 
-        {/*
-          Form Section
+              {/* Forgot Password Link */}
+              <Pressable
+                onPress={handleForgotPassword}
+                disabled={true} // Enable in Phase 7
+                className="self-end -mt-2"
+              >
+                <Text variant="muted">Forgot password?</Text>
+              </Pressable>
+            </View>
 
-          Email and password inputs with validation.
-          Uses our custom form components from Phase 2.
-        */}
-        <View style={styles.form}>
-          {/*
-            Email Input
+            {/**
+             * Error Message
+             *
+             * Shows validation or authentication errors.
+             * Only appears when there's an error to display.
+             * Positioned after form, before the spacer.
+             */}
+            {displayError && (
+              <View className="bg-destructive rounded-lg p-4 mt-4">
+                <Text className="text-destructive-foreground text-sm">
+                  {displayError}
+                </Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
 
-            TextInput component from our design system.
-            Features:
-            - Email keyboard type (shows @ and .com keys)
-            - Auto-capitalize off (emails are lowercase)
-            - Auto-correct off (don't correct email addresses)
-            - Returns "next" (goes to password on Return key)
-          */}
-          <TextInput
-            label="Email"
-            placeholder="your.email@example.com"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!isLoading}
-          />
-
-          {/*
-            Password Input
-
-            PasswordInput component with show/hide toggle.
-            Features:
-            - Secure text entry (dots instead of characters)
-            - Toggle button to show/hide password
-            - Returns "done" (submits form on Return key)
-          */}
-          <PasswordInput
-            label="Password"
-            placeholder="Enter your password"
-            value={password}
-            onChangeText={setPassword}
-            onSubmitEditing={handleSignIn}
-            editable={!isLoading}
-            style={styles.passwordInput}
-          />
-
-          {/*
-            Forgot Password Link
-
-            Text link to password recovery flow.
-            Common UX pattern: place near password input.
-
-            Disabled until Phase 7 when we implement password recovery.
-          */}
-          <Pressable
-            onPress={handleForgotPassword}
-            disabled={true} // TODO: Enable in Phase 7
-            style={styles.forgotPasswordContainer}
-          >
-            <Text style={styles.forgotPasswordText}>Forgot password?</Text>
-          </Pressable>
-
-          {/*
-            Error Message
-
-            Shows validation or authentication errors.
-            Only renders if there's an error to show.
-
-            Uses FormErrorMessage component for consistent error styling.
-          */}
-          {error ? <FormErrorMessage error={error} /> : null}
-
-          {/*
-            Sign In Button
-
-            Primary action button.
-            Features:
-            - Shows loading spinner when authenticating
-            - Disabled during loading (prevents multiple submissions)
-            - Full width for easy tapping
-            - Large size for prominence
-          */}
+        {/**
+         * Fixed Bottom Section
+         *
+         * Contains the CTA button and footer link.
+         * This section is OUTSIDE the ScrollView so it stays at the bottom.
+         *
+         * WHY OUTSIDE SCROLLVIEW?
+         * 1. Always visible at the bottom of the screen
+         * 2. Moves up with keyboard (inside KeyboardAvoidingView)
+         * 3. Closer to thumb - better mobile UX
+         * 4. No need to scroll to find the submit button
+         *
+         * The button is disabled when:
+         * - Form is not valid (!isFormValid)
+         * - API request is in progress (loading)
+         *
+         * This provides clear visual feedback - user knows when they can submit.
+         */}
+        <View className="px-6 pb-6 pt-2">
+          {/**
+           * Sign In Button
+           *
+           * Primary action with loading state.
+           * isLoading prop shows spinner and disables button.
+           * disabled when form is invalid OR loading is in progress.
+           *
+           * Button appears at 50% opacity when disabled, providing
+           * visual feedback that more input is needed.
+           */}
           <Button
-            variant="primary"
-            size="large"
-            title="Sign In"
             onPress={handleSignIn}
-            loading={isLoading}
-            disabled={isLoading}
-            fullWidth
-            style={styles.signInButton}
-          />
-        </View>
-
-        {/*
-          Footer Section
-
-          Sign up prompt for users who don't have an account yet.
-          Common pattern: "Don't have an account? Sign up"
-        */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account? </Text>
-          <Pressable
-            onPress={handleCreateAccount}
-            disabled={true} // TODO: Enable in Phase 6
+            isLoading={loading}
+            disabled={loading || !isFormValid}
+            className="mb-3"
           >
-            <Text style={styles.footerLink}>Create one</Text>
-          </Pressable>
+            Sign In
+          </Button>
+
+          {/**
+           * Footer Section
+           *
+           * Sign up prompt for new users.
+           * Grouped with button for cohesive bottom action area.
+           */}
+          <View className="flex-row justify-center items-center py-2">
+            <Text variant="muted">Don't have an account? </Text>
+            <Pressable onPress={handleCreateAccount}>
+              <Text className="text-primary font-semibold">Create one</Text>
+            </Pressable>
+          </View>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 /**
- * Styles for Sign In Screen
- *
- * DESIGN PRINCIPLES:
- * 1. Generous spacing: Forms need breathing room
- * 2. Clear focus: Form is the star, minimal distractions
- * 3. Hierarchy: Title → Form → Footer
- * 4. Accessibility: Large touch targets, clear labels
- */
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-
-  scrollContent: {
-    flexGrow: 1,
-    padding: spacing.xl,
-  },
-
-  // Header: Top section with back button and title
-  header: {
-    marginBottom: spacing.xxl,
-  },
-
-  backButton: {
-    alignSelf: 'flex-start', // Align to left
-    marginBottom: spacing.lg,
-    paddingVertical: spacing.xs,
-  },
-
-  backButtonText: {
-    ...body.regular,
-    color: colors.primary,
-    fontSize: 16,
-  },
-
-  title: {
-    ...headings.h1,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-
-  subtitle: {
-    ...body.large,
-    color: colors.textSecondary,
-  },
-
-  // Form: Input fields and button
-  form: {
-    marginBottom: spacing.xxl,
-  },
-
-  passwordInput: {
-    marginTop: spacing.lg,
-  },
-
-  forgotPasswordContainer: {
-    alignSelf: 'flex-end', // Align to right
-    marginTop: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-
-  forgotPasswordText: {
-    ...body.regular,
-    color: colors.textTertiary, // Less prominent (disabled)
-    fontSize: 14,
-  },
-
-  signInButton: {
-    marginTop: spacing.lg,
-  },
-
-  // Footer: Sign up prompt
-  footer: {
-    flexDirection: 'row', // Horizontal layout
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 'auto', // Push to bottom
-    paddingTop: spacing.xl,
-  },
-
-  footerText: {
-    ...body.regular,
-    color: colors.textSecondary,
-  },
-
-  footerLink: {
-    ...body.medium, // Medium weight for emphasis
-    color: colors.textTertiary, // Less prominent (disabled)
-  },
-});
-
-/**
  * LEARNING NOTES:
  *
- * 1. FORM VALIDATION STRATEGY
- *    Two layers of validation:
- *    - Client-side (this screen): Fast feedback, better UX
- *    - Server-side (Supabase): Security, data integrity
- *    Never rely on client-side validation alone!
+ * 1. NEW UI COMPONENTS
+ *    We now use our custom components:
+ *    - <Input> instead of custom TextInput + PasswordInput
+ *    - <Button isLoading> instead of Button loading prop
+ *    - <Text variant="..."> instead of styled Text
  *
- * 2. KEYBOARD HANDLING
- *    Mobile keyboard can cover inputs, frustrating users.
- *    Our solution:
- *    - KeyboardAvoidingView: Adjusts layout when keyboard appears
- *    - ScrollView: Allows scrolling to covered content
- *    - keyboardShouldPersistTaps="handled": Allows tapping buttons
+ * 2. TAILWIND CLASS BENEFITS
+ *    - gap-4: Consistent 16px spacing between form elements
+ *    - mb-6, mb-8: Clear visual sections
+ *    - flex-row items-center: Easy horizontal layouts
+ *    - self-end: Align forgot password to right
  *
- * 3. LOADING STATES
- *    Always show loading state during async operations:
- *    - Provides feedback (user knows something is happening)
- *    - Prevents double submissions (button disabled during loading)
- *    - Manages expectations (user knows to wait)
+ * 3. ERROR STYLING
+ *    Uses our semantic destructive colors:
+ *    - bg-destructive: Soft red background (#FEE2E2)
+ *    - text-destructive-foreground: Dark red text (#B91C1C)
  *
- * 4. ERROR HANDLING
- *    Good error handling:
- *    - Catches all errors (network, validation, auth)
- *    - Shows user-friendly messages
- *    - Allows user to retry
- *    - Logs errors for debugging (in production)
+ * 4. KEYBOARD HANDLING (IMPROVED)
+ *    - KeyboardAvoidingView: Pushes content up on iOS
+ *    - ScrollView: Allows scrolling when keyboard is open
+ *    - Fixed bottom section: Button moves with keyboard
+ *    - keyboardShouldPersistTaps="handled": Proper tap handling
  *
- * 5. ASYNC/AWAIT vs PROMISES
- *    Both handle asynchronous code, but async/await is cleaner:
+ * 5. ICON USAGE
+ *    Using lucide-react-native:
+ *    - ArrowLeft for back button
+ *    - Consistent icon style across app
+ *    - Primary color (#6B8E7B) for brand consistency
  *
- *    Promises:
- *    signIn().then(handleSuccess).catch(handleError).finally(cleanup);
+ * 6. FORM ACCESSIBILITY
+ *    - Labels linked to inputs via Input component
+ *    - Error messages visible to screen readers
+ *    - Disabled states prevent interaction during loading
  *
- *    Async/await:
- *    try { await signIn(); } catch (err) { } finally { }
+ * 7. REDUX INTEGRATION (unchanged)
+ *    - dispatch(signIn({ email, password })) triggers auth
+ *    - loading/error come from Redux state
+ *    - Navigation handled by root layout on success
  *
- * 6. CONTROLLED COMPONENTS
- *    Our inputs are "controlled" - React controls their value:
- *    - value={email} → React state is source of truth
- *    - onChangeText={setEmail} → Updates React state
- *    - No uncontrolled DOM state
+ * 8. FORM VALIDATION UX (NEW)
+ *    - isFormValid computed value checks all fields
+ *    - Button disabled until form is complete and valid
+ *    - Provides visual feedback (50% opacity when disabled)
+ *    - Prevents unnecessary error messages from premature taps
  *
- *    Benefits:
- *    - Easy to validate
- *    - Easy to reset
- *    - Single source of truth
- *
- * 7. DECLARATIVE NAVIGATION
- *    We don't manually navigate on successful sign in.
- *    Instead:
- *    1. Sign in updates auth state
- *    2. Root layout observes auth state
- *    3. Root layout shows appropriate screens
- *
- *    This is "declarative" - UI is a function of state.
- *
- * 8. KEYBOARD TYPES
- *    Different keyboard types optimize input:
- *    - 'email-address': Shows @ and .com keys
- *    - 'numeric': Shows number pad
- *    - 'phone-pad': Shows phone number layout
- *    - 'default': Standard keyboard
- *
- * 9. RETURN KEY TYPES
- *    returnKeyType tells iOS what to show on Return key:
- *    - 'next': Moves to next input
- *    - 'done': Dismisses keyboard
- *    - 'go': Submits form
- *    - 'search': Shows search icon
- *
- * 10. ACCESSIBILITY
- *     Form accessibility requirements:
- *     - Labels for all inputs (we use label prop)
- *     - Clear error messages (we use FormErrorMessage)
- *     - Keyboard navigation (handled by TextInput)
- *     - Screen reader support (handled by React Native)
- *
- * SECURITY NOTES:
- * - Never log passwords (even during debugging)
- * - Always use HTTPS (Supabase enforces this)
- * - Store tokens securely (Supabase handles this)
- * - Validate on server (client validation can be bypassed)
- *
- * NEXT STEPS:
- * - Phase 6: Create sign-up screen (similar structure)
- * - Phase 7: Add forgot-password screen
- * - Phase 8: Test and refine UX
+ * 9. BOTTOM BUTTON PATTERN (NEW)
+ *    - Button placed outside ScrollView
+ *    - Stays at bottom of screen (ergonomic for thumb)
+ *    - Moves up with keyboard (easy to tap after typing)
+ *    - Common mobile UX pattern used by major apps
  */

@@ -51,7 +51,7 @@ import { colors } from '../../src/theme';
  */
 export default function AuthLayout() {
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       {/*
         TouchableWithoutFeedback for Keyboard Dismissal
 

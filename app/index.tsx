@@ -2,20 +2,18 @@
  * Root Index Screen
  *
  * This is the entry point of the app (route "/").
- * It handles initial routing based on authentication state.
+ * It handles initial routing based on authentication state from Redux.
  *
  * In Expo Router, app/index.tsx is the root route that users see first.
  * From here, we redirect to the appropriate screen based on whether
  * the user is authenticated or not.
  *
- * ROUTING LOGIC:
- * For Phase 5, we're building the auth screens, so we redirect everyone
- * to the welcome screen for testing purposes.
- *
- * In Phase 8 (Route Protection), this will be updated to:
- * - Check authentication state (useAuth hook)
- * - Redirect to /home if authenticated
- * - Redirect to /welcome if not authenticated
+ * REDUX INTEGRATION:
+ * This screen reads auth state from Redux using useAppSelector.
+ * The routing logic is:
+ * - If not initialized yet → Show nothing (or loading screen)
+ * - If user is authenticated → Redirect to home
+ * - If user is not authenticated → Redirect to welcome
  *
  * This pattern is called "conditional routing" or "protected routes".
  *
@@ -25,51 +23,135 @@
  * and ensures users always see the correct screen for their state.
  */
 
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
-// TODO: Phase 8 - Import useAuth to check authentication state
-// import { useAuth } from '../src/context/AuthContext';
+import { useAppSelector } from '../src/store';
+import { colors } from '../src/theme';
 
 /**
  * IndexScreen Component
  *
- * CURRENT BEHAVIOR (Phase 5):
- * Always redirects to /welcome for testing auth screens.
+ * ROUTING LOGIC:
+ * 1. Check if auth has been initialized
+ * 2. If not initialized → Show loading (prevents flash)
+ * 3. If initialized and user exists → Redirect to /home
+ * 4. If initialized and no user → Redirect to /welcome
  *
- * FUTURE BEHAVIOR (Phase 8):
- * Will check auth state and redirect accordingly:
- * - Authenticated users → /home
- * - Unauthenticated users → /welcome
+ * WHY CHECK INITIALIZED?
+ * On app start, Redux state is:
+ * - user: undefined
+ * - initialized: false
  *
- * REDIRECT COMPONENT:
- * Redirect is a special component from expo-router that:
- * - Immediately navigates to the specified route
- * - Replaces the current screen (can't go back to index)
- * - Works during initial render (no flash of wrong screen)
+ * Without waiting for initialized:
+ * - App sees user = undefined (falsy)
+ * - Redirects to /welcome immediately
+ * - Then auth initializes, finds session, user becomes defined
+ * - App would need to redirect to /home
  *
- * The href prop specifies where to redirect to.
+ * This causes a flash: Welcome → Home
+ *
+ * With initialized check:
+ * - App sees initialized = false
+ * - Shows loading screen
+ * - Auth initializes (checks AsyncStorage for session)
+ * - initialized becomes true, user becomes User or null
+ * - Now we redirect to correct screen
+ *
+ * No flash! User goes directly to the right screen.
  */
 export default function IndexScreen() {
   /**
-   * Phase 8 Implementation Plan:
+   * Read Auth State from Redux
    *
-   * const { user, isLoading } = useAuth();
+   * We need two pieces of state:
+   * - user: Is someone logged in?
+   * - initialized: Has the auth check completed?
    *
-   * // Show loading screen while checking auth state
-   * if (isLoading) {
-   *   return <LoadingScreen />;
-   * }
-   *
-   * // Redirect based on authentication state
-   * if (user) {
-   *   return <Redirect href="/home" />;
-   * } else {
-   *   return <Redirect href="/welcome" />;
-   * }
+   * useAppSelector is our typed hook that knows about RootState.
+   * TypeScript knows:
+   * - user is User | null | undefined
+   * - initialized is boolean
    */
+  const { user, initialized } = useAppSelector((state) => state.auth);
 
-  // For Phase 5: Always redirect to welcome screen
+  /**
+   * Loading State
+   *
+   * If auth hasn't been initialized yet, show a loading indicator.
+   * This prevents the "flash" problem described above.
+   *
+   * This loading screen is very brief (usually < 100ms) because:
+   * - AsyncStorage reads are fast
+   * - If no session, initialized = true quickly
+   * - If session exists, initialized = true with user data
+   *
+   * FUTURE ENHANCEMENT:
+   * You could replace this with a branded splash screen
+   * or animation for a more polished experience.
+   */
+  if (!initialized) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  /**
+   * Redirect Based on Auth State
+   *
+   * Now that we know the auth state for sure:
+   * - user exists → User is logged in → Go to home
+   * - user is null → User is not logged in → Go to welcome
+   *
+   * REDIRECT COMPONENT:
+   * Redirect is a special component from expo-router that:
+   * - Immediately navigates to the specified route
+   * - Replaces the current screen (can't go back to index)
+   * - Works during initial render (no flash of wrong screen)
+   */
+  if (user) {
+    /**
+     * User is Authenticated
+     *
+     * Redirect to the main app (home screen).
+     * The home screen will show the authenticated user experience.
+     *
+     * The /home route is defined in app/(app)/home.tsx.
+     * It displays:
+     * - User profile data from Firebase Auth
+     * - Sign out button to test the auth flow
+     */
+    return <Redirect href="/home" />;
+  }
+
+  /**
+   * User is Not Authenticated
+   *
+   * Redirect to the welcome screen to start the auth flow.
+   */
   return <Redirect href="/welcome" />;
 }
+
+/**
+ * Styles for Index Screen
+ *
+ * Only needed for the loading state.
+ */
+const styles = StyleSheet.create({
+  /**
+   * Loading Container
+   *
+   * Centers the loading indicator on screen.
+   * Uses the app's background color for consistency.
+   */
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+});
 
 /**
  * LEARNING NOTES:
@@ -97,7 +179,7 @@ export default function IndexScreen() {
  *    - Creates seamless UX (no manual navigation needed)
  *
  * 3. LOADING STATES
- *    When checking auth state (Phase 8), always handle loading:
+ *    Always handle the loading/initializing state:
  *    - Auth state takes time to initialize (async)
  *    - Show loading screen during initialization
  *    - Prevents redirect flashing (welcome → home)
@@ -120,26 +202,59 @@ export default function IndexScreen() {
  *    - Can have different layouts
  *    - Useful for conditional rendering
  *
- * 7. AUTHENTICATION FLOW
- *    Complete flow across all phases:
- *    - User opens app → index.tsx
- *    - Not authenticated → Redirect to /welcome
- *    - User taps Sign In → /sign-in
- *    - User enters credentials → AuthContext.signIn()
- *    - Auth state updates → Redirect to /home
- *    - User closes/reopens app → Session persists → /home
+ * 7. AUTHENTICATION FLOW WITH REDUX
+ *
+ *    App Start:
+ *    1. RootLayout renders
+ *    2. Provider wraps app
+ *    3. AppInitializer dispatches initializeAuth()
+ *    4. Redux updates: initialized = true, user = User | null
+ *
+ *    IndexScreen:
+ *    1. Reads { user, initialized } from Redux
+ *    2. If not initialized → Show loading
+ *    3. If initialized → Redirect based on user
+ *
+ *    Sign In:
+ *    1. User enters credentials on /sign-in
+ *    2. dispatch(signIn({ email, password }))
+ *    3. On success: Redux updates user
+ *    4. onAuthStateChange fires → setAuthState()
+ *    5. Any component watching user re-renders
+ *
+ * 8. SELECTOR USAGE
+ *
+ *    We use useAppSelector to read from Redux:
+ *    const { user, initialized } = useAppSelector(state => state.auth);
+ *
+ *    This component re-renders when auth state changes.
+ *    After successful sign-in, user changes, and we redirect to home.
+ *
+ * 9. COMPARING TO CONTEXT APPROACH
+ *
+ *    Before (Context):
+ *    const { user, initialized } = useAuth();
+ *
+ *    After (Redux):
+ *    const { user, initialized } = useAppSelector(state => state.auth);
+ *
+ *    Very similar! The main difference is:
+ *    - Context: State managed in AuthProvider component
+ *    - Redux: State managed in global store
+ *    - Redux: DevTools show state changes
+ *    - Redux: Easier to add more slices (user profile, settings, etc.)
  *
  * PHASE PROGRESSION:
- * - Phase 5 (Current): Build auth screens, always show /welcome
- * - Phase 6: Add sign-up screen
- * - Phase 7: Add password recovery
- * - Phase 8: Implement proper auth-based routing here
+ * - Phase 5: Build auth screens, auth-based routing ✓
+ * - Phase 6: Add sign-up screen ✓
+ * - Phase 7: Add password recovery (future)
+ * - Phase 8: Implement home screen at /home route ✓
  *
- * TESTING PHASE 5:
- * To test the auth screens we just built:
- * 1. App opens → Redirects to /welcome
- * 2. Tap "Sign In" → Navigate to /sign-in
- * 3. Tap "Back" → Return to /welcome
- * 4. Enter credentials → Test form validation
- * 5. Submit form → Test auth integration (Phase 4)
+ * TESTING:
+ * To test the auth flow:
+ * 1. App opens → Loading briefly → Redirects to /welcome (if not logged in)
+ * 2. Sign in with valid credentials → Redirects to /home
+ * 3. Home screen shows user data (email, displayName, uid, etc.)
+ * 4. Tap Sign Out → Redirects back to /welcome
+ * 5. Close and reopen app → Should stay logged in (session persisted)
  */

@@ -56,7 +56,7 @@ export const colors = {
    */
 
   /** Main app background - the canvas everything sits on */
-  background: '#F5F5F5',     // Very light gray (easier on eyes than pure white)
+  background: '#FAFAF9',     // Warm off-white (stone-50) - matches Tailwind bg-background
 
   /** Surface color - for cards, modals, sheets */
   surface: '#FFFFFF',        // Pure white for elevated content

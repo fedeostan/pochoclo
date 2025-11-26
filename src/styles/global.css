@@ -1,0 +1,26 @@
+/**
+ * Global Styles
+ *
+ * This file is the entry point for all Tailwind CSS styles in our app.
+ * NativeWind processes this file and makes all Tailwind utilities available
+ * for use with the className prop in React Native components.
+ *
+ * THE THREE DIRECTIVES:
+ * 1. @tailwind base: Resets and base element styles (normalized defaults)
+ * 2. @tailwind components: Component classes (like .btn, .card - we'll add custom ones)
+ * 3. @tailwind utilities: All utility classes (bg-*, text-*, p-*, etc.)
+ *
+ * WHY THIS ORDER MATTERS:
+ * CSS specificity flows from least to most specific:
+ * base < components < utilities
+ * This allows utilities to override component styles when needed.
+ */
+
+/* Base styles - foundational resets and defaults */
+@tailwind base;
+
+/* Component styles - reusable component patterns */
+@tailwind components;
+
+/* Utility styles - single-purpose helper classes */
+@tailwind utilities;
