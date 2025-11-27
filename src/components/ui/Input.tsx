@@ -24,7 +24,7 @@ import {
   View,
   Pressable,
 } from "react-native";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 import { Text } from "./Text";
 import { Eye, EyeOff } from "lucide-react-native";
 

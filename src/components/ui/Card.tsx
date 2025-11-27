@@ -19,7 +19,7 @@
 
 import React from "react";
 import { View, ViewProps, Pressable, PressableProps } from "react-native";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 import { Text } from "./Text";
 
 /**

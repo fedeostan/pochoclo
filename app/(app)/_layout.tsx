@@ -1,136 +1,365 @@
 /**
- * App Layout - Route Group for Authenticated Screens
+ * App Layout - Bottom Tab Navigation for Authenticated Screens
  *
- * This layout wraps all screens that require authentication (home, profile, etc.)
- * The (app) folder name is a "route group" - the parentheses mean this folder
- * organizes routes without adding to the URL path.
+ * This layout provides the main navigation structure for authenticated users.
+ * It uses Expo Router's Tabs component to create a bottom tab bar with
+ * three main sections: Home, Discover, and Profile.
  *
- * WHAT IS A ROUTE GROUP?
- * In Expo Router, folders wrapped in parentheses like (app) are "route groups".
- * They help organize related screens without affecting the URL structure.
+ * WHAT IS TAB NAVIGATION?
+ * Tab navigation is a pattern where the main sections of an app are accessible
+ * through tabs at the bottom (iOS style) or top (Android Material style) of the screen.
+ * Bottom tabs are more common in mobile apps because they're easier to reach with thumbs.
  *
- * For example:
- * - app/(app)/home.tsx → URL is "/home" (not "/app/home")
- * - app/(app)/profile.tsx → URL is "/profile" (not "/app/profile")
+ * WHY USE TABS HERE?
+ * 1. Primary Navigation: Main sections should be easily accessible
+ * 2. Persistent: Tab bar stays visible as you navigate within sections
+ * 3. Familiar: Users expect bottom tabs in mobile apps
+ * 4. Efficient: One tap to switch between major sections
  *
- * WHY USE A ROUTE GROUP FOR APP SCREENS?
- * 1. Organization: Keep all authenticated screens together
- * 2. Shared Layout: Apply consistent styling/behavior to app screens
- * 3. Separation: Clear distinction between auth screens and app screens
- * 4. Clean URLs: Don't expose internal organization in URLs
- *
- * LAYOUT PURPOSE:
- * This layout provides:
- * - Consistent navigation structure for authenticated screens
- * - Background styling using our design system colors
- * - Stack navigation for screen transitions
+ * ROUTE GROUP REMINDER:
+ * The (app) folder is a "route group" - the parentheses mean files here
+ * create routes like /home, /discover, /profile (not /app/home).
  */
 
-import { Stack } from 'expo-router';
-import { colors } from '../../src/theme';
+import { Tabs } from 'expo-router';
+import { Home, Compass, User } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /**
- * AppLayout Component
+ * Design System Colors
  *
- * Wraps all authenticated app screens with:
- * - Stack navigation for smooth transitions
- * - Consistent background styling
- * - Hidden headers (we use custom NavBar in screens)
+ * We define colors inline here instead of importing from theme because:
+ * 1. Tab bar needs these specific values for its configuration
+ * 2. Keeps this file self-contained and easy to understand
+ * 3. These match our Tailwind config (UI_RULES.md)
  *
- * STACK VS TABS:
- * We use Stack navigation here because:
- * - It's simpler for learning
- * - Works well for single-screen demo (home screen)
- * - Can be converted to Tabs later when needed
+ * These colors follow our design system:
+ * - Primary: Soft sage green (#6B8E7B)
+ * - Muted: Medium gray for inactive states (#78716C)
+ * - Background: Warm off-white (#FAFAF9)
+ * - Border: Light gray for subtle separation (#E7E5E4)
+ */
+const TAB_BAR_COLORS = {
+  active: '#6B8E7B',      // Primary sage green - stands out for active tab
+  inactive: '#78716C',    // Muted gray - recedes for inactive tabs
+  background: '#FAFAF9',  // Warm off-white - matches app background
+  border: '#E7E5E4',      // Light border - subtle separation
+};
+
+/**
+ * Icon Size Constant
  *
- * FUTURE ENHANCEMENT:
- * When you have multiple main sections (Home, Profile, Settings),
- * you might want to use Tabs navigation here instead.
+ * 24px is a standard size for navigation icons:
+ * - Large enough to tap easily (touch target should be 44px minimum)
+ * - Small enough to not dominate the tab bar
+ * - Consistent with Material Design and iOS guidelines
+ */
+const ICON_SIZE = 24;
+
+/**
+ * AppLayout Component - Tab Navigator
+ *
+ * Configures the bottom tab bar with three tabs:
+ * - Home: Main dashboard showing user data (home.tsx)
+ * - Discover: Content discovery section (discover.tsx)
+ * - Profile: User profile and settings (profile.tsx)
+ *
+ * TABS VS STACK:
+ * - Stack: Screens slide in/out, good for hierarchical navigation
+ * - Tabs: Screens are siblings, good for parallel sections
+ *
+ * We use Tabs because Home, Discover, and Profile are parallel sections
+ * that users frequently switch between.
  */
 export default function AppLayout() {
+  /**
+   * Safe Area Insets
+   *
+   * useSafeAreaInsets() returns the safe area insets for the current device:
+   * - top: Status bar height (notch area on iPhone X+)
+   * - bottom: Home indicator (iPhone X+) or navigation bar (Android)
+   * - left/right: Usually 0, but can be non-zero on landscape or certain devices
+   *
+   * WHY USE THIS FOR TAB BAR?
+   * On Android with gesture navigation or 3-button navigation, there's a system
+   * navigation bar at the bottom. Without accounting for this, our tab bar would
+   * be hidden behind it.
+   *
+   * By using insets.bottom, we dynamically add the correct padding so the tab bar
+   * sits ABOVE the system navigation bar on all devices.
+   *
+   * iOS:
+   * - iPhone X+: insets.bottom ≈ 34px (home indicator)
+   * - Older iPhones: insets.bottom = 0
+   *
+   * Android:
+   * - Gesture navigation: insets.bottom ≈ 24-48px
+   * - 3-button navigation: insets.bottom ≈ 48px
+   * - No navigation bar: insets.bottom = 0
+   */
+  const insets = useSafeAreaInsets();
+
+  /**
+   * Calculate Tab Bar Height
+   *
+   * Base height: 60px (content area for icons + labels)
+   * Plus bottom inset: Varies by device (0-48px typically)
+   *
+   * This ensures consistent tab bar content height across all devices,
+   * while respecting each device's safe area requirements.
+   */
+  const TAB_BAR_HEIGHT = 60;
+  const tabBarHeight = TAB_BAR_HEIGHT + insets.bottom;
+
   return (
-    <Stack
+    <Tabs
+      /**
+       * Screen Options - Global Tab Bar Configuration
+       *
+       * These options apply to all tabs in this navigator.
+       * Individual tabs can override these with their own options.
+       */
       screenOptions={{
         /**
-         * Hide Default Header
+         * Hide Header
          *
-         * We hide the default navigation header because:
-         * - Our screens use custom NavBar component
-         * - More control over styling and behavior
-         * - Consistent look across the app
+         * We hide the default tab navigator header because:
+         * - Each screen manages its own header/navigation
+         * - More control over styling per screen
+         * - Some screens might want no header, others custom headers
          */
         headerShown: false,
 
         /**
-         * Content Style
+         * Tab Bar Style
          *
-         * Sets the background color for all screens in this group.
-         * Uses our design system background (#FAFAF9 - warm off-white).
+         * Configures the visual appearance of the tab bar.
+         *
+         * backgroundColor: Warm off-white to match our design system
+         * borderTopColor: Subtle gray line to separate from content
+         * borderTopWidth: 1px line (hairline on iOS)
+         * elevation: 0 to remove Android shadow (we use border instead)
+         *
+         * DYNAMIC SAFE AREA HANDLING:
+         * - height: Base height + bottom inset for system navigation bar
+         * - paddingBottom: Bottom inset ensures content doesn't overlap system UI
+         * - paddingTop: Fixed 8px for consistent spacing above icons
+         *
+         * This works on ALL devices:
+         * - iPhone X+ with home indicator
+         * - Older iPhones without home indicator
+         * - Android with gesture navigation
+         * - Android with 3-button navigation
+         * - Android without navigation bar (rare)
          */
-        contentStyle: {
-          backgroundColor: colors.background,
+        tabBarStyle: {
+          backgroundColor: TAB_BAR_COLORS.background,
+          borderTopColor: TAB_BAR_COLORS.border,
+          borderTopWidth: 1,
+          elevation: 0, // Removes Android shadow
+          height: tabBarHeight,
+          paddingBottom: insets.bottom,
+          paddingTop: 8,
         },
 
         /**
-         * Animation Style
+         * Tab Bar Active/Inactive Colors
          *
-         * 'default' uses platform-specific animations:
-         * - iOS: Slide from right
-         * - Android: Fade with slight slide
+         * tabBarActiveTintColor: Color for the active tab (icon + label)
+         * tabBarInactiveTintColor: Color for inactive tabs
+         *
+         * Active tabs use our primary sage green to draw attention.
+         * Inactive tabs use muted gray to recede visually.
+         *
+         * This creates clear visual hierarchy showing where you are.
          */
-        animation: 'default',
+        tabBarActiveTintColor: TAB_BAR_COLORS.active,
+        tabBarInactiveTintColor: TAB_BAR_COLORS.inactive,
+
+        /**
+         * Tab Bar Label Style
+         *
+         * Configures the text labels below each icon.
+         *
+         * fontSize: 12px is standard for tab labels (readable but not dominant)
+         * fontWeight: 500 (medium) provides good balance of visibility
+         * marginTop: Small space between icon and label for visual separation
+         */
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '500',
+          marginTop: 4,
+        },
       }}
     >
-      {/*
-        Screen Configuration
+      {/**
+       * HOME TAB
+       *
+       * The main screen users see after signing in.
+       * name="home" maps to home.tsx file (route "/home").
+       *
+       * WHY "home" INSTEAD OF "index"?
+       * Using index.tsx would conflict with app/index.tsx (root router).
+       * By using home.tsx, we have a clear, unique route path "/home".
+       * This makes navigation simpler and avoids routing ambiguity.
+       */}
+      <Tabs.Screen
+        name="home"
+        options={{
+          /**
+           * Tab Title
+           * Shown below the icon in the tab bar
+           */
+          title: 'Home',
 
-        We could configure individual screens here with:
-        <Stack.Screen name="home" options={{ ... }} />
+          /**
+           * Tab Icon
+           *
+           * Function receives { color, size, focused } and returns an icon.
+           * We use the provided color to match active/inactive states.
+           *
+           * lucide-react-native icons accept:
+           * - size: Number for width/height in pixels
+           * - color: String color value (hex, rgb, etc.)
+           * - strokeWidth: Line thickness (2 is default)
+           *
+           * The Home icon represents the main/dashboard section.
+           */
+          tabBarIcon: ({ color, focused }) => (
+            <Home
+              size={ICON_SIZE}
+              color={color}
+              strokeWidth={focused ? 2.5 : 2}
+            />
+          ),
+        }}
+      />
 
-        For now, we let each screen handle its own options.
-        The Stack automatically discovers .tsx files in this folder.
+      {/**
+       * DISCOVER TAB
+       *
+       * Content discovery section for exploring new content.
+       * name="discover" maps to discover.tsx file.
+       */}
+      <Tabs.Screen
+        name="discover"
+        options={{
+          title: 'Discover',
+          /**
+           * Compass Icon
+           *
+           * The Compass represents exploration and discovery.
+           * It's a common icon choice for "discover" or "explore" sections.
+           * Alternatives: Search, Grid, Globe
+           */
+          tabBarIcon: ({ color, focused }) => (
+            <Compass
+              size={ICON_SIZE}
+              color={color}
+              strokeWidth={focused ? 2.5 : 2}
+            />
+          ),
+        }}
+      />
 
-        Files in this (app) folder will include:
-        - home.tsx → /home (current phase)
-        - profile.tsx → /profile (future)
-        - settings.tsx → /settings (future)
-      */}
-    </Stack>
+      {/**
+       * PROFILE TAB
+       *
+       * User profile and account settings.
+       * name="profile" maps to profile.tsx file.
+       */}
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          /**
+           * User Icon
+           *
+           * The User icon clearly represents personal/profile content.
+           * This is the most universally recognized icon for profiles.
+           */
+          tabBarIcon: ({ color, focused }) => (
+            <User
+              size={ICON_SIZE}
+              color={color}
+              strokeWidth={focused ? 2.5 : 2}
+            />
+          ),
+        }}
+      />
+    </Tabs>
   );
 }
 
 /**
  * LEARNING NOTES:
  *
- * 1. ROUTE GROUPS SUMMARY
- *    (auth) group: Sign in, Sign up, Welcome (unauthenticated)
- *    (app) group: Home, Profile, Settings (authenticated)
+ * 1. EXPO ROUTER TABS
+ *    Expo Router's Tabs component is built on React Navigation's
+ *    Bottom Tab Navigator. It integrates with file-based routing.
  *
- *    This separation makes it clear which screens require auth.
+ * 2. FILE-TO-TAB MAPPING
+ *    - home.tsx → Home tab
+ *    - discover.tsx → Discover tab
+ *    - profile.tsx → Profile tab
  *
- * 2. LAYOUT HIERARCHY
- *    app/_layout.tsx (root - Redux Provider, Firebase Auth listener)
- *    └── app/(app)/_layout.tsx (this file - authenticated screens)
- *        └── app/(app)/home.tsx (individual screen)
+ *    The "name" prop in Tabs.Screen must match the filename (without .tsx).
  *
- * 3. NAVIGATION FLOW
- *    App opens → index.tsx checks auth state:
- *    - No user → Redirect to /welcome (auth group)
- *    - Has user → Redirect to /home (app group)
+ * 3. SAFE AREA INSETS (CRITICAL FOR ANDROID!)
+ *    useSafeAreaInsets() from react-native-safe-area-context provides
+ *    the exact pixel values needed to avoid system UI:
  *
- * 4. WHY MINIMAL LAYOUT?
- *    This layout is simple because:
- *    - We want flexibility in individual screens
- *    - Each screen can have its own header/navigation
- *    - We're keeping things simple for learning
+ *    REQUIREMENTS:
+ *    - SafeAreaProvider must wrap the entire app (in app/_layout.tsx)
+ *    - Without it, insets return 0 and UI gets hidden behind system bars
  *
- * 5. FUTURE ENHANCEMENTS
- *    When the app grows, you might add:
- *    - Auth protection (redirect if not logged in)
- *    - Tab navigation for main sections
- *    - Drawer navigation for settings
- *    - Shared bottom navigation bar
+ *    HOW WE USE IT:
+ *    - Add insets.bottom to tab bar height
+ *    - Add insets.bottom to tab bar paddingBottom
+ *    - This pushes the tab bar above the Android navigation bar
  *
- * NEXT STEPS:
- * Now we create home.tsx with user data display and sign out button.
+ *    WHY NOT FIXED VALUES?
+ *    - Different Android devices have different navigation bar heights
+ *    - Gesture navigation vs 3-button navigation have different sizes
+ *    - Some Android devices have no navigation bar at all
+ *    - Dynamic values work everywhere automatically
+ *
+ * 4. ICON LIBRARIES
+ *    We use lucide-react-native for icons because:
+ *    - Consistent design language
+ *    - Customizable (size, color, stroke width)
+ *    - Tree-shakeable (only imports used icons)
+ *    - Same icons work in web and native
+ *
+ * 5. PLATFORM CONSIDERATIONS
+ *    iOS and Android have different design conventions:
+ *    - iOS: Bottom tabs with home indicator area
+ *    - Android: Material Design tabs, system navigation bar
+ *
+ *    We handle BOTH with useSafeAreaInsets() - no Platform.OS checks needed!
+ *
+ * 6. FOCUSED STATE
+ *    The focused prop tells us if a tab is active.
+ *    We use this to make active icons slightly bolder (strokeWidth: 2.5).
+ *    This subtle change reinforces which tab is selected.
+ *
+ * 7. COLOR INHERITANCE
+ *    When you set tabBarActiveTintColor and tabBarInactiveTintColor,
+ *    the tab bar passes the appropriate color to each icon function.
+ *    This keeps colors consistent without manual checking.
+ *
+ * 8. NAVIGATION WITHIN TABS
+ *    Each tab can have its own Stack navigator for deeper navigation.
+ *    For example, Profile could have sub-screens like EditProfile.
+ *    This is done by creating a folder like (app)/profile/_layout.tsx.
+ *
+ * 9. TAB BAR HIDING
+ *    Sometimes you want to hide the tab bar on certain screens.
+ *    This can be done with: tabBarStyle: { display: 'none' }
+ *    Or by navigating outside the tab navigator.
+ *
+ * TROUBLESHOOTING SAFE AREAS:
+ * - Tab bar hidden behind navigation bar? Check SafeAreaProvider is in root layout
+ * - Insets returning 0? Make sure SafeAreaProvider wraps the entire app
+ * - Content cut off? Use SafeAreaView in your screens with appropriate edges
  */

@@ -349,7 +349,7 @@ When creating new UI components:
 
 import React from "react";
 import { View, ViewProps } from "react-native";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 
 interface ComponentNameProps extends ViewProps {
   className?: string;

@@ -1,8 +1,8 @@
 /**
- * Utility Functions
+ * Class Name Utility (cn)
  *
- * This file contains helper functions used throughout the app.
- * The most important one is `cn` - a utility for merging Tailwind class names.
+ * A utility function for merging Tailwind CSS class names.
+ * Combines the power of clsx and tailwind-merge.
  *
  * WHY WE NEED THIS:
  * When building components, we often need to:

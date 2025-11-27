@@ -24,7 +24,7 @@ import {
   ActivityIndicator,
   View,
 } from "react-native";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 import { Text } from "./Text";
 
 /**

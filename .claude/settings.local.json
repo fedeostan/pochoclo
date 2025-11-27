@@ -8,7 +8,15 @@
       "WebSearch",
       "Bash(git add:*)",
       "Bash(git rm:*)",
-      "Bash(git commit -m \"$(cat <<''EOF''\nCorregir exposición de credenciales de Firebase\n\n- Añadir archivos de configuración Firebase a .gitignore\n- Eliminar valores hardcoded de firebase.ts (ahora requiere .env)\n- Remover GoogleService-Info.plist y google-services.json del seguimiento\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
+      "Bash(git commit -m \"$(cat <<''EOF''\nCorregir exposición de credenciales de Firebase\n\n- Añadir archivos de configuración Firebase a .gitignore\n- Eliminar valores hardcoded de firebase.ts (ahora requiere .env)\n- Remover GoogleService-Info.plist y google-services.json del seguimiento\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(bfg:*)",
+      "Bash(git reflog:*)",
+      "Bash(git gc:*)",
+      "Bash(git push:*)",
+      "mcp__firebase__firebase_get_environment",
+      "mcp__firebase__firebase_get_security_rules",
+      "Bash(cat:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

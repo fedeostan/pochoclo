@@ -19,7 +19,7 @@
 
 import React from "react";
 import { Text as RNText, TextProps as RNTextProps } from "react-native";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 
 /**
  * Text Variants

@@ -41,6 +41,7 @@ import { View } from "react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Provider } from "react-redux";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { store, useAppDispatch } from "../src/store";
 import { setAuthState } from "../src/store/slices/authSlice";
 
@@ -217,79 +218,102 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   return (
     /**
-     * Redux Provider
+     * SafeAreaProvider
      *
-     * Provider from react-redux makes the Redux store available
-     * to all child components via Context (internally).
+     * This provider is ESSENTIAL for proper safe area handling across the app.
+     * It detects and provides inset values for:
+     * - Status bar (top) on all devices
+     * - Home indicator (bottom) on iPhone X+ and newer Android
+     * - Android system navigation bar (bottom)
      *
-     * Any component in the tree can now use:
-     * - useAppSelector: Read state from the store
-     * - useAppDispatch: Dispatch actions to update state
+     * WITHOUT SafeAreaProvider:
+     * - useSafeAreaInsets() hook returns 0 for all values
+     * - SafeAreaView components don't work correctly
+     * - UI gets hidden behind system bars
      *
-     * Without Provider, these hooks would throw an error.
+     * WITH SafeAreaProvider:
+     * - All child components can access accurate inset values
+     * - Tab bars, headers, and content respect system UI
+     * - Works on both iOS and Android (including gesture navigation)
      *
-     * The store prop is our configured Redux store from store/index.ts.
+     * MUST be the outermost wrapper in the component tree.
      */
-    <Provider store={store}>
-      {/*
-        AppInitializer handles Firebase auth setup.
-        Must be inside Provider to use Redux hooks.
-      */}
-      <AppInitializer>
+    <SafeAreaProvider>
+      {/**
+       * Redux Provider
+       *
+       * Provider from react-redux makes the Redux store available
+       * to all child components via Context (internally).
+       *
+       * Any component in the tree can now use:
+       * - useAppSelector: Read state from the store
+       * - useAppDispatch: Dispatch actions to update state
+       *
+       * Without Provider, these hooks would throw an error.
+       *
+       * The store prop is our configured Redux store from store/index.ts.
+       */}
+      <Provider store={store}>
         {/*
-          StatusBar Component
-
-          Controls the appearance of the status bar (the top bar showing time, battery, etc.)
-          - "auto" style means: dark text on light background, light text on dark background
-          - This respects the user's system appearance preferences
-
-          In React Native, you need to explicitly manage the StatusBar.
-          On web, the browser handles this automatically.
+          AppInitializer handles Firebase auth setup.
+          Must be inside Provider to use Redux hooks.
         */}
-        <StatusBar style="auto" />
-
-        {/*
-          Root View with Background Color
-
-          This View wraps the entire navigation stack and sets the background color
-          for the entire app, including the status bar area (top) and home indicator
-          area (bottom) on iOS.
-
-          WHY THIS MATTERS:
-          - Without this, system areas show a default gray color
-          - The background color (#FAFAF9) matches our design system's "background"
-          - This creates a seamless look from edge to edge
-
-          flex: 1 ensures this View takes up the full screen.
-        */}
-        <View style={{ flex: 1, backgroundColor: "#FAFAF9" }}>
+        <AppInitializer>
           {/*
-            Stack Navigator
+            StatusBar Component
 
-            Stack provides a stack-based navigation pattern where screens are
-            "pushed" onto a stack and can be "popped" off.
+            Controls the appearance of the status bar (the top bar showing time, battery, etc.)
+            - "auto" style means: dark text on light background, light text on dark background
+            - This respects the user's system appearance preferences
 
-            Think of it like a deck of cards - you can add cards on top (push),
-            and remove the top card (pop/go back).
-
-            SCREEN OPTIONS:
-            We're configuring global options for all screens in the stack:
-            - headerShown: false → We'll build custom headers using our design system
-            - animation: 'default' → Use platform-native animations (slide on iOS, fade on Android)
-            - contentStyle: Sets the background color for screen content
-
-            Each individual screen can override these options if needed.
+            In React Native, you need to explicitly manage the StatusBar.
+            On web, the browser handles this automatically.
           */}
-          <Stack
-            screenOptions={{
-              headerShown: false, // Hide default header (we'll create custom ones)
-              animation: "default", // Platform-specific navigation animations
-              contentStyle: { backgroundColor: "#FAFAF9" }, // Match our background color
-            }}
-          />
-        </View>
-      </AppInitializer>
-    </Provider>
+          <StatusBar style="auto" />
+
+          {/*
+            Root View with Background Color
+
+            This View wraps the entire navigation stack and sets the background color
+            for the entire app, including the status bar area (top) and home indicator
+            area (bottom) on iOS.
+
+            WHY THIS MATTERS:
+            - Without this, system areas show a default gray color
+            - The background color (#FAFAF9) matches our design system's "background"
+            - This creates a seamless look from edge to edge
+
+            flex: 1 ensures this View takes up the full screen.
+          */}
+          <View style={{ flex: 1, backgroundColor: "#FAFAF9" }}>
+            {/*
+              Stack Navigator
+
+              Stack provides a stack-based navigation pattern where screens are
+              "pushed" onto a stack and can be "popped" off.
+
+              Think of it like a deck of cards - you can add cards on top (push),
+              and remove the top card (pop/go back).
+
+              SCREEN OPTIONS:
+              We're configuring global options for all screens in the stack:
+              - headerShown: false → We'll build custom headers using our design system
+              - animation: 'default' → Use platform-native animations (slide on iOS, fade on Android)
+              - contentStyle: Sets the background color for screen content
+
+              Each individual screen can override these options if needed.
+            */}
+            <Stack
+              screenOptions={{
+                headerShown: false, // Hide default header (we'll create custom ones)
+                animation: "default", // Platform-specific navigation animations
+                contentStyle: { backgroundColor: "#FAFAF9" }, // Match our background color
+              }}
+            />
+          </View>
+        </AppInitializer>
+      </Provider>
+    </SafeAreaProvider>
   );
 }
 
