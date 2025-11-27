@@ -53,6 +53,11 @@ import {
 // Import our configured Firebase auth instance
 import { auth } from '../../config/firebase';
 
+// Import our Firebase services for profile image operations
+// These handle the actual file upload/delete and database updates
+import { uploadProfileImage, deleteProfileImage, getStorageErrorMessage } from '../../services/storage';
+import { updateUserProfileImage as updateFirestoreProfileImage } from '../../services/firestore';
+
 /**
  * =============================================================================
  * SERIALIZABLE USER TYPE
@@ -134,6 +139,8 @@ function serializeUser(user: User): SerializableUser {
  * - loading: Shows spinner during operations
  * - initialized: Prevents flash of wrong screen on app load
  * - error: Stores error messages to display to user
+ * - profileImageLoading: Separate loading state for profile image operations
+ * - profileImageError: Separate error state for profile image operations
  */
 interface AuthState {
   /**
@@ -213,6 +220,46 @@ interface AuthState {
    * - "auth/too-many-requests" → "Too many attempts, try later"
    */
   error: string | null;
+
+  /**
+   * Profile Image Loading State
+   *
+   * Separate from the main 'loading' state because:
+   * - Profile image operations can happen independently from auth operations
+   * - We want to show a loading indicator specifically on the avatar
+   * - The user can still interact with other parts of the app during upload
+   *
+   * True when:
+   * - Uploading a new profile image
+   * - Removing the current profile image
+   *
+   * WHY SEPARATE LOADING STATES?
+   * Think of it like this: if you're uploading a profile picture, you don't
+   * want the entire app to appear "loading". You just want the avatar
+   * component to show a spinner while the rest of the screen stays interactive.
+   *
+   * This pattern is called "localized loading states" - each operation
+   * has its own loading indicator.
+   */
+  profileImageLoading: boolean;
+
+  /**
+   * Profile Image Error State
+   *
+   * Stores error messages from failed profile image operations.
+   * null means no error.
+   *
+   * Separate from the main 'error' state because:
+   * - Profile image errors should be displayed differently (maybe a toast)
+   * - We don't want an image upload error to interfere with auth errors
+   * - Allows the user to dismiss image errors independently
+   *
+   * Common errors:
+   * - "Failed to upload profile image: Network error"
+   * - "Failed to delete profile image: Permission denied"
+   * - "You don't have permission to access this file"
+   */
+  profileImageError: string | null;
 }
 
 /**
@@ -224,6 +271,8 @@ interface AuthState {
  * - loading: false (not loading)
  * - initialized: false (haven't set up listener yet)
  * - error: null (no error)
+ * - profileImageLoading: false (not uploading)
+ * - profileImageError: null (no image error)
  *
  * NOTE: No session field! Firebase handles tokens internally.
  */
@@ -232,6 +281,8 @@ const initialState: AuthState = {
   loading: false,
   initialized: false,
   error: null,
+  profileImageLoading: false,
+  profileImageError: null,
 };
 
 /**
@@ -555,6 +606,255 @@ export const resetPassword = createAsyncThunk(
 
 /**
  * =============================================================================
+ * PROFILE IMAGE THUNKS
+ * =============================================================================
+ *
+ * These thunks handle profile image upload and deletion.
+ * They coordinate multiple services to ensure data consistency:
+ *
+ * 1. Firebase Storage: Stores the actual image file
+ * 2. Firebase Auth: Updates the user's photoURL property
+ * 3. Firestore: Updates the user document with the new photoURL
+ *
+ * WHY UPDATE ALL THREE?
+ * - Firebase Auth photoURL: Used by Firebase services and onAuthStateChanged
+ * - Firestore photoURL: For app-specific queries and additional user data
+ * - Both should stay in sync to avoid confusion
+ *
+ * ORDER OF OPERATIONS:
+ * For upload: Storage → Get URL → Auth Update → Firestore Update
+ * For delete: Storage → Auth Update → Firestore Update
+ *
+ * This order ensures:
+ * - The file is uploaded before we try to reference it
+ * - URLs are only saved after the file exists
+ * - If any step fails, we have a clear point of failure
+ */
+
+/**
+ * Update Profile Image Payload Type
+ *
+ * The imageUri is the local file path from the image picker.
+ * In React Native, this is typically a file:// URI.
+ *
+ * Example: "file:///var/mobile/Containers/Data/Application/.../image.jpg"
+ */
+interface UpdateProfileImagePayload {
+  imageUri: string;
+}
+
+/**
+ * Update Profile Image Thunk
+ *
+ * Uploads a new profile image and updates all relevant places.
+ *
+ * FLOW:
+ * 1. Dispatch updateProfileImage({ imageUri })
+ * 2. Redux dispatches pending → profileImageLoading = true
+ * 3. Upload image to Firebase Storage
+ * 4. Get the download URL
+ * 5. Update Firebase Auth profile with new photoURL
+ * 6. Update Firestore user document with new photoURL
+ * 7. Redux dispatches fulfilled → user.photoURL updated
+ *
+ * WHY ALL THESE STEPS?
+ * - Storage: Actual file needs to be somewhere accessible
+ * - Auth: photoURL is part of the Firebase User object
+ * - Firestore: Our app's user profile data
+ *
+ * LEARNING NOTE: Async Thunk with Multiple Service Calls
+ * This thunk coordinates multiple async operations.
+ * If any fails, the whole operation is rejected.
+ * This is called "saga-like" coordination in one function.
+ *
+ * @param payload - { imageUri: string } - Local path to the image
+ * @returns { photoURL } - The new download URL
+ */
+export const updateUserProfileImage = createAsyncThunk(
+  'auth/updateProfileImage',
+  async (payload: UpdateProfileImagePayload, { getState, rejectWithValue }) => {
+    const { imageUri } = payload;
+
+    try {
+      /**
+       * Step 1: Get the current user
+       *
+       * We need the user's UID to know where to store the image.
+       * getState() gives us access to the entire Redux state.
+       *
+       * TYPE CASTING:
+       * getState() returns unknown by default.
+       * We cast it to our RootState shape to access state.auth.
+       *
+       * Note: We import RootState type inline to avoid circular dependency.
+       * Alternatively, we could define the type here.
+       */
+      const state = getState() as { auth: AuthState };
+      const user = state.auth.user;
+
+      // Guard: Can't update profile if not logged in
+      if (!user) {
+        return rejectWithValue('You must be signed in to update your profile image.');
+      }
+
+      /**
+       * Step 2: Upload image to Firebase Storage
+       *
+       * This function (from storage.ts):
+       * - Converts the local URI to a Blob
+       * - Uploads to profile-images/{userId}/avatar.jpg
+       * - Returns the public download URL
+       *
+       * If the user already had a profile image, this OVERWRITES it.
+       * Firebase Storage replaces files with the same path.
+       */
+      const downloadURL = await uploadProfileImage(user.uid, imageUri);
+
+      /**
+       * Step 3: Update Firebase Auth profile
+       *
+       * updateProfile is a Firebase Auth method that updates:
+       * - displayName (not changing here)
+       * - photoURL (the new image URL)
+       *
+       * This ensures auth.currentUser.photoURL is up to date.
+       * The onAuthStateChanged listener will pick up this change.
+       *
+       * IMPORTANT: auth.currentUser vs state.auth.user
+       * - auth.currentUser: Live Firebase User object (has methods)
+       * - state.auth.user: Serialized snapshot in Redux (plain data)
+       *
+       * We update auth.currentUser, then return new data for Redux.
+       */
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await updateProfile(currentUser, { photoURL: downloadURL });
+      }
+
+      /**
+       * Step 4: Update Firestore user document
+       *
+       * This keeps our Firestore data in sync with Auth.
+       * Some apps only use one or the other, but having both
+       * gives us flexibility for future features.
+       *
+       * We renamed the import to updateFirestoreProfileImage to avoid
+       * collision with our thunk name (updateUserProfileImage).
+       */
+      await updateFirestoreProfileImage(user.uid, downloadURL);
+
+      /**
+       * Step 5: Return the new photoURL
+       *
+       * The fulfilled reducer will use this to update state.auth.user.photoURL.
+       * This ensures Redux state matches what we just saved.
+       */
+      return { photoURL: downloadURL };
+
+    } catch (error: unknown) {
+      /**
+       * Error Handling
+       *
+       * If any step fails, we catch the error here.
+       * Firebase Storage errors have a 'code' property.
+       * We use our helper to get a user-friendly message.
+       */
+      console.error('Error updating profile image:', error);
+
+      const storageError = error as { code?: string; message?: string };
+      const errorMessage = storageError.code
+        ? getStorageErrorMessage(storageError.code)
+        : storageError.message || 'Failed to update profile image';
+
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
+ * Remove Profile Image Thunk
+ *
+ * Removes the user's profile image from all places.
+ *
+ * FLOW:
+ * 1. Dispatch removeProfileImage()
+ * 2. Redux dispatches pending → profileImageLoading = true
+ * 3. Delete image from Firebase Storage
+ * 4. Update Firebase Auth profile with photoURL = null
+ * 5. Update Firestore user document with photoURL = null
+ * 6. Redux dispatches fulfilled → user.photoURL = null
+ *
+ * WHY ALLOW NULL PHOTOS?
+ * - Not all users want a profile picture
+ * - User might want to remove an existing picture
+ * - Privacy: User can remove identifiable photos
+ *
+ * The Avatar component should handle null/undefined photoURL
+ * by showing a fallback (initials, default icon, etc.)
+ *
+ * @returns undefined (no payload needed)
+ */
+export const removeUserProfileImage = createAsyncThunk(
+  'auth/removeProfileImage',
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      /**
+       * Step 1: Get the current user
+       */
+      const state = getState() as { auth: AuthState };
+      const user = state.auth.user;
+
+      if (!user) {
+        return rejectWithValue('You must be signed in to remove your profile image.');
+      }
+
+      /**
+       * Step 2: Delete image from Firebase Storage
+       *
+       * This function handles the case where no image exists.
+       * It silently succeeds if there's nothing to delete.
+       */
+      await deleteProfileImage(user.uid);
+
+      /**
+       * Step 3: Update Firebase Auth profile
+       *
+       * Set photoURL to null to clear the profile image.
+       */
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await updateProfile(currentUser, { photoURL: null });
+      }
+
+      /**
+       * Step 4: Update Firestore user document
+       *
+       * Set photoURL to null in Firestore as well.
+       */
+      await updateFirestoreProfileImage(user.uid, null);
+
+      /**
+       * Step 5: Return success
+       *
+       * The fulfilled reducer will set state.auth.user.photoURL = null.
+       */
+      return undefined;
+
+    } catch (error: unknown) {
+      console.error('Error removing profile image:', error);
+
+      const storageError = error as { code?: string; message?: string };
+      const errorMessage = storageError.code
+        ? getStorageErrorMessage(storageError.code)
+        : storageError.message || 'Failed to remove profile image';
+
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
+ * =============================================================================
  * AUTH SLICE
  * =============================================================================
  *
@@ -644,6 +944,31 @@ const authSlice = createSlice({
       // If user is null, store null (not logged in)
       state.user = action.payload.user ? serializeUser(action.payload.user) : null;
       state.initialized = true;
+    },
+
+    /**
+     * Clear Profile Image Error
+     *
+     * Resets the profile image error state to null.
+     * Call this when dismissing a profile image error or before a new attempt.
+     *
+     * WHY A SEPARATE ACTION FROM clearError?
+     * - Profile image errors are independent from auth errors
+     * - A user might dismiss a "failed to upload" error and try again
+     * - We don't want to accidentally clear auth errors when clearing image errors
+     *
+     * USAGE:
+     * dispatch(clearProfileImageError());
+     *
+     * EXAMPLE SCENARIO:
+     * 1. User tries to upload an image → fails due to network
+     * 2. App shows an error toast with "Dismiss" button
+     * 3. User taps dismiss → dispatch(clearProfileImageError())
+     * 4. Error toast disappears
+     * 5. User tries again (now the error is already cleared)
+     */
+    clearProfileImageError: (state) => {
+      state.profileImageError = null;
     },
   },
 
@@ -769,6 +1094,117 @@ const authSlice = createSlice({
       .addCase(resetPassword.rejected, (state, action) => {
         state.loading = false;
         state.error = (action.payload as string) ?? 'Failed to send reset email';
+      })
+
+      // =========================================================================
+      // UPDATE PROFILE IMAGE
+      // =========================================================================
+      /**
+       * Update Profile Image Reducers
+       *
+       * Handle the three states of the updateUserProfileImage async thunk.
+       *
+       * IMPORTANT: We use profileImageLoading and profileImageError here,
+       * NOT the main loading/error states. This keeps profile image
+       * operations independent from auth operations.
+       *
+       * WHY THIS MATTERS:
+       * Imagine a user is uploading a profile image and gets signed out
+       * by another session. If we used the same loading state, the UI
+       * would be confused about what's happening.
+       */
+      .addCase(updateUserProfileImage.pending, (state) => {
+        /**
+         * Upload Started
+         *
+         * Set profileImageLoading = true so the Avatar component
+         * can show a spinner or loading overlay.
+         *
+         * Clear any previous profile image errors.
+         */
+        state.profileImageLoading = true;
+        state.profileImageError = null;
+      })
+      .addCase(updateUserProfileImage.fulfilled, (state, action) => {
+        /**
+         * Upload Succeeded
+         *
+         * action.payload contains { photoURL: string }
+         *
+         * We update the user's photoURL in Redux state.
+         * This triggers a re-render of components using this data.
+         *
+         * LEARNING NOTE: Immer Deep Updates
+         * With Immer, we can directly "mutate" nested objects.
+         * This code looks like mutation but Immer makes it immutable!
+         *
+         * Without Immer, we'd have to write:
+         * return {
+         *   ...state,
+         *   profileImageLoading: false,
+         *   user: state.user ? { ...state.user, photoURL: action.payload.photoURL } : null
+         * };
+         *
+         * With Immer:
+         * state.user.photoURL = action.payload.photoURL;  // Much simpler!
+         */
+        state.profileImageLoading = false;
+        if (state.user) {
+          state.user.photoURL = action.payload.photoURL;
+        }
+      })
+      .addCase(updateUserProfileImage.rejected, (state, action) => {
+        /**
+         * Upload Failed
+         *
+         * Set profileImageError with the error message.
+         * The UI can show this in a toast or alert.
+         *
+         * The user's photoURL remains unchanged (their old image is still there).
+         */
+        state.profileImageLoading = false;
+        state.profileImageError = (action.payload as string) ?? 'Failed to update profile image';
+      })
+
+      // =========================================================================
+      // REMOVE PROFILE IMAGE
+      // =========================================================================
+      /**
+       * Remove Profile Image Reducers
+       *
+       * Handle the three states of the removeUserProfileImage async thunk.
+       * Very similar to update, but we set photoURL to null on success.
+       */
+      .addCase(removeUserProfileImage.pending, (state) => {
+        /**
+         * Removal Started
+         *
+         * Show loading state while we delete the image.
+         */
+        state.profileImageLoading = true;
+        state.profileImageError = null;
+      })
+      .addCase(removeUserProfileImage.fulfilled, (state) => {
+        /**
+         * Removal Succeeded
+         *
+         * Set photoURL to null to indicate no profile image.
+         * The Avatar component should show a fallback (initials, icon).
+         */
+        state.profileImageLoading = false;
+        if (state.user) {
+          state.user.photoURL = null;
+        }
+      })
+      .addCase(removeUserProfileImage.rejected, (state, action) => {
+        /**
+         * Removal Failed
+         *
+         * The image might still exist in Storage.
+         * User's photoURL remains unchanged.
+         */
+        state.profileImageLoading = false;
+        state.profileImageError = (action.payload as string) ?? 'Failed to remove profile image';
       });
   },
 });
@@ -779,11 +1215,17 @@ const authSlice = createSlice({
  * These are the synchronous actions from the reducers object.
  * Components can dispatch these directly.
  *
+ * ACTIONS:
+ * - clearError: Clear the main auth error state
+ * - clearProfileImageError: Clear the profile image error state
+ * - setAuthState: Sync Redux with Firebase auth state (used by onAuthStateChanged)
+ *
  * USAGE:
- * import { clearError, setAuthState } from '../store/slices/authSlice';
+ * import { clearError, setAuthState, clearProfileImageError } from '../store/slices/authSlice';
  * dispatch(clearError());
+ * dispatch(clearProfileImageError());
  */
-export const { clearError, setAuthState } = authSlice.actions;
+export const { clearError, setAuthState, clearProfileImageError } = authSlice.actions;
 
 /**
  * Export Reducer
@@ -874,4 +1316,66 @@ export default authSlice.reducer;
  * onAuthStateChanged(auth, (user) => {
  *   dispatch(setAuthState({ user }));
  * });
+ *
+ * =============================================================================
+ * PROFILE IMAGE MANAGEMENT (ADDED IN PHASE 5)
+ * =============================================================================
+ *
+ * Profile image operations involve coordination between multiple Firebase services:
+ *
+ * SERVICES INVOLVED:
+ * 1. Firebase Storage - Stores the actual image file
+ * 2. Firebase Auth - User's photoURL property
+ * 3. Firestore - User document with photoURL field
+ *
+ * WHY ALL THREE?
+ * - Storage: Where the actual bytes live (the image file)
+ * - Auth photoURL: Used by Firebase services and triggers onAuthStateChanged
+ * - Firestore: For app-specific queries and additional user data
+ *
+ * DATA FLOW FOR UPLOAD:
+ * 1. User picks image → ImagePicker returns local URI (file://...)
+ * 2. dispatch(updateUserProfileImage({ imageUri }))
+ * 3. Thunk: Upload to Storage → Get download URL
+ * 4. Thunk: Update Firebase Auth profile
+ * 5. Thunk: Update Firestore document
+ * 6. Reducer: Update state.auth.user.photoURL
+ * 7. UI: Avatar component re-renders with new image
+ *
+ * DATA FLOW FOR REMOVE:
+ * 1. User taps "Remove Photo"
+ * 2. dispatch(removeUserProfileImage())
+ * 3. Thunk: Delete from Storage (if exists)
+ * 4. Thunk: Update Firebase Auth profile (photoURL = null)
+ * 5. Thunk: Update Firestore document (photoURL = null)
+ * 6. Reducer: Set state.auth.user.photoURL = null
+ * 7. UI: Avatar component shows fallback (initials/icon)
+ *
+ * LOCALIZED LOADING STATES:
+ * We use profileImageLoading instead of the main loading state.
+ * This allows the user to interact with other parts of the app
+ * while an image is uploading in the background.
+ *
+ * USAGE EXAMPLES:
+ *
+ * Upload a new profile image:
+ * const result = await dispatch(updateUserProfileImage({ imageUri }));
+ * if (updateUserProfileImage.fulfilled.match(result)) {
+ *   console.log('Upload succeeded!');
+ * }
+ *
+ * Remove the profile image:
+ * await dispatch(removeUserProfileImage());
+ *
+ * Clear profile image error:
+ * dispatch(clearProfileImageError());
+ *
+ * Access state in components:
+ * const { profileImageLoading, profileImageError } = useAppSelector(state => state.auth);
+ *
+ * PHOTOURL SYNC WITH onAuthStateChanged:
+ * When updateProfile() is called on Firebase Auth, it MAY trigger
+ * onAuthStateChanged (implementation varies). Our setAuthState reducer
+ * handles this by re-serializing the user, which includes the new photoURL.
+ * This ensures Redux state stays in sync with Firebase Auth.
  */

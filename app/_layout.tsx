@@ -42,6 +42,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Provider } from "react-redux";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { store, useAppDispatch } from "../src/store";
 import { setAuthState } from "../src/store/slices/authSlice";
 
@@ -210,35 +211,57 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
  * 3. Stack navigator (navigation)
  *
  * COMPONENT HIERARCHY:
- * Provider (Redux store)
- *   └── AppInitializer (Firebase auth listener)
- *         └── Stack (navigation)
- *               └── Screens
+ * GestureHandlerRootView (gesture handling for bottom sheets)
+ *   └── SafeAreaProvider (safe area insets)
+ *         └── Provider (Redux store)
+ *               └── AppInitializer (Firebase auth listener)
+ *                     └── Stack (navigation)
+ *                           └── Screens
  */
 export default function RootLayout() {
   return (
     /**
-     * SafeAreaProvider
+     * GestureHandlerRootView
      *
-     * This provider is ESSENTIAL for proper safe area handling across the app.
-     * It detects and provides inset values for:
-     * - Status bar (top) on all devices
-     * - Home indicator (bottom) on iPhone X+ and newer Android
-     * - Android system navigation bar (bottom)
+     * This wrapper is REQUIRED for libraries that use react-native-gesture-handler,
+     * most notably @gorhom/bottom-sheet which we use for ImagePickerSheet.
      *
-     * WITHOUT SafeAreaProvider:
-     * - useSafeAreaInsets() hook returns 0 for all values
-     * - SafeAreaView components don't work correctly
-     * - UI gets hidden behind system bars
+     * WHY IS THIS NEEDED?
+     * react-native-gesture-handler provides custom gesture handling that's
+     * more performant than React Native's built-in gesture system. However,
+     * it requires a root view to attach its gesture recognizers.
      *
-     * WITH SafeAreaProvider:
-     * - All child components can access accurate inset values
-     * - Tab bars, headers, and content respect system UI
-     * - Works on both iOS and Android (including gesture navigation)
+     * WITHOUT GestureHandlerRootView:
+     * - BottomSheet and other gesture-based components won't work
+     * - You'll see: "GestureDetector must be used as a descendant of GestureHandlerRootView"
      *
-     * MUST be the outermost wrapper in the component tree.
+     * WITH GestureHandlerRootView:
+     * - All gesture-based libraries work correctly
+     * - Swipe-to-dismiss, pan gestures, etc. are handled properly
+     *
+     * NOTE: style={{ flex: 1 }} is essential to make it fill the entire screen.
      */
-    <SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      {/**
+       * SafeAreaProvider
+       *
+       * This provider is ESSENTIAL for proper safe area handling across the app.
+       * It detects and provides inset values for:
+       * - Status bar (top) on all devices
+       * - Home indicator (bottom) on iPhone X+ and newer Android
+       * - Android system navigation bar (bottom)
+       *
+       * WITHOUT SafeAreaProvider:
+       * - useSafeAreaInsets() hook returns 0 for all values
+       * - SafeAreaView components don't work correctly
+       * - UI gets hidden behind system bars
+       *
+       * WITH SafeAreaProvider:
+       * - All child components can access accurate inset values
+       * - Tab bars, headers, and content respect system UI
+       * - Works on both iOS and Android (including gesture navigation)
+       */}
+      <SafeAreaProvider>
       {/**
        * Redux Provider
        *
@@ -313,7 +336,8 @@ export default function RootLayout() {
           </View>
         </AppInitializer>
       </Provider>
-    </SafeAreaProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

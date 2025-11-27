@@ -43,6 +43,15 @@ import {
   getReactNativePersistence,
 } from 'firebase/auth';
 
+// Import Firebase Firestore (NoSQL database)
+// getFirestore() returns the Firestore database instance
+// Firestore stores data in collections and documents (like folders and files)
+import { getFirestore, Firestore } from 'firebase/firestore';
+
+// Import Firebase Storage (for file uploads like images)
+// getStorage() returns the Storage instance for uploading/downloading files
+import { getStorage, FirebaseStorage } from 'firebase/storage';
+
 // Import AsyncStorage for persisting auth sessions
 // This is the React Native equivalent of browser localStorage
 // It stores data on the device that persists between app restarts
@@ -202,6 +211,60 @@ try {
 }
 
 /**
+ * Initialize Firebase Firestore
+ *
+ * Firestore is a NoSQL document database. Data is organized as:
+ * - Collections: Like folders that hold documents (e.g., "users", "posts")
+ * - Documents: Individual records with fields (e.g., a user profile)
+ * - Subcollections: Collections inside documents for nested data
+ *
+ * FIRESTORE VS TRADITIONAL SQL:
+ * - SQL: Tables with rows and columns, strict schema
+ * - Firestore: Collections with documents, flexible schema
+ *
+ * Example structure for our app:
+ * users (collection)
+ *   └── {userId} (document)
+ *         ├── email: "user@example.com"
+ *         ├── displayName: "John Doe"
+ *         ├── photoURL: "https://..."
+ *         ├── createdAt: Timestamp
+ *         └── updatedAt: Timestamp
+ *
+ * WHY USE FIRESTORE FOR USER DATA?
+ * - Firebase Auth stores basic info (email, displayName, photoURL)
+ * - Firestore lets us store additional user data (preferences, settings, etc.)
+ * - Easier to query and filter users
+ * - Better for future features (friends, followers, etc.)
+ */
+const db: Firestore = getFirestore(app);
+
+/**
+ * Initialize Firebase Storage
+ *
+ * Firebase Storage is for uploading and downloading files (images, videos, etc.).
+ * Files are organized in a folder-like structure with paths.
+ *
+ * STORAGE STRUCTURE FOR PROFILE IMAGES:
+ * profile-images/
+ *   └── {userId}/
+ *         └── avatar.jpg
+ *
+ * WHY THIS STRUCTURE?
+ * - Each user has their own folder (isolated by userId)
+ * - Easy to set security rules per user
+ * - Simple to find and manage a user's files
+ *
+ * STORAGE SECURITY:
+ * Unlike the API keys in firebaseConfig, Storage needs security rules.
+ * We'll configure rules in Firebase Console to:
+ * - Allow users to upload only to their own folder
+ * - Allow anyone to read profile images (public avatars)
+ * - Limit file sizes and types
+ */
+const storage: FirebaseStorage = getStorage(app);
+
+/**
  * Export Firebase Instances
  *
  * We export both app and auth so other parts of the app can use them:
@@ -225,8 +288,25 @@ try {
  *
  * const db = getFirestore(app);
  * ```
+ *
+ * For Storage (file uploads):
+ * ```
+ * import { storage } from '../config/firebase';
+ * import { ref, uploadBytes } from 'firebase/storage';
+ *
+ * const storageRef = ref(storage, 'profile-images/userId/avatar.jpg');
+ * await uploadBytes(storageRef, file);
+ * ```
+ *
+ * For Firestore (database):
+ * ```
+ * import { db } from '../config/firebase';
+ * import { doc, setDoc } from 'firebase/firestore';
+ *
+ * await setDoc(doc(db, 'users', userId), { photoURL: 'https://...' });
+ * ```
  */
-export { app, auth };
+export { app, auth, db, storage };
 
 /**
  * COMPARISON: SUPABASE VS FIREBASE SETUP

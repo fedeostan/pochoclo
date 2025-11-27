@@ -94,10 +94,11 @@ module.exports = {
           foreground: "#C2785C", // Warm terracotta text
         },
 
-        // Destructive - Soft red for errors (not harsh)
+        // Destructive - Visible red for errors and dangerous actions
+        // Still soft enough to fit our design, but clearly recognizable as "danger"
         destructive: {
-          DEFAULT: "#FEE2E2", // Red-100
-          foreground: "#B91C1C", // Red-700
+          DEFAULT: "#FCA5A5", // Red-300 - soft but clearly red
+          foreground: "#991B1B", // Red-800 - dark red for good contrast
         },
 
         // Border color - subtle and unobtrusive

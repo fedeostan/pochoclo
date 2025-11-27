@@ -54,3 +54,11 @@ export type {
 // Navigation
 export { NavBar, useNavBarHeight, NAV_BAR_CONTENT_HEIGHT } from "./NavBar";
 export type { NavBarProps } from "./NavBar";
+
+// Overlays & Sheets
+export { BottomSheet } from "./BottomSheet";
+export type { BottomSheetProps, BottomSheetRef } from "./BottomSheet";
+
+// Media & Avatars
+export { Avatar, getInitials } from "./Avatar";
+export type { AvatarProps, AvatarSize } from "./Avatar";
