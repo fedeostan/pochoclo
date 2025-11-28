@@ -22,3 +22,16 @@
 // (authSlice has the main definition, auth.ts has additional types)
 export type { SerializableUser } from "../store/slices/authSlice";
 export type { SignInCredentials, SignUpCredentials } from "./auth";
+
+// Re-export content-related types
+// Used for AI content generation system (n8n integration)
+export type {
+  ContentRequest,
+  ContentSource,
+  ContentBody,
+  ContentStatus,
+  GeneratedContent,
+  ContentHistoryEntry,
+  ContentState,
+  TriggerContentResult,
+} from "./content";

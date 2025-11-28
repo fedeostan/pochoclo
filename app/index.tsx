@@ -2,25 +2,34 @@
  * Root Index Screen
  *
  * This is the entry point of the app (route "/").
- * It handles initial routing based on authentication state from Redux.
+ * It handles initial routing based on authentication state AND onboarding
+ * status from Redux.
  *
  * In Expo Router, app/index.tsx is the root route that users see first.
- * From here, we redirect to the appropriate screen based on whether
- * the user is authenticated or not.
+ * From here, we redirect to the appropriate screen based on:
+ * 1. Authentication status (user logged in?)
+ * 2. Onboarding status (has user completed onboarding?)
+ *
+ * ROUTING LOGIC:
+ * - Not initialized yet → Show loading (prevent flash)
+ * - Not authenticated → /welcome (auth flow)
+ * - Authenticated, onboarding incomplete → /onboarding/category-selection
+ * - Authenticated, onboarding complete → /home (main app)
  *
  * REDUX INTEGRATION:
- * This screen reads auth state from Redux using useAppSelector.
- * The routing logic is:
- * - If not initialized yet → Show nothing (or loading screen)
- * - If user is authenticated → Redirect to home
- * - If user is not authenticated → Redirect to welcome
+ * This screen reads from two Redux slices:
+ * - auth: For user authentication state
+ * - userPreferences: For onboarding completion status
  *
  * This pattern is called "conditional routing" or "protected routes".
  *
- * WHY USE REDIRECT?
- * The Redirect component from expo-router immediately navigates to
- * another screen. This prevents showing a blank or loading screen
- * and ensures users always see the correct screen for their state.
+ * WHY CHECK ONBOARDING?
+ * New users need to complete onboarding to:
+ * - Select learning categories (personalized content)
+ * - Set daily learning time (pacing)
+ *
+ * We check onboardingCompleted to ensure new users go through this flow
+ * while returning users skip directly to the home screen.
  */
 
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
@@ -34,8 +43,10 @@ import { colors } from '../src/theme';
  * ROUTING LOGIC:
  * 1. Check if auth has been initialized
  * 2. If not initialized → Show loading (prevents flash)
- * 3. If initialized and user exists → Redirect to /home
- * 4. If initialized and no user → Redirect to /welcome
+ * 3. If initialized and no user → Redirect to /welcome
+ * 4. If initialized and user exists but preferences loading → Show loading
+ * 5. If initialized and user exists but onboarding incomplete → Redirect to /onboarding
+ * 6. If initialized and user exists and onboarding complete → Redirect to /home
  *
  * WHY CHECK INITIALIZED?
  * On app start, Redux state is:
@@ -55,6 +66,7 @@ import { colors } from '../src/theme';
  * - Shows loading screen
  * - Auth initializes (checks AsyncStorage for session)
  * - initialized becomes true, user becomes User or null
+ * - Preferences are loaded (to check onboardingCompleted)
  * - Now we redirect to correct screen
  *
  * No flash! User goes directly to the right screen.
@@ -68,26 +80,28 @@ export default function IndexScreen() {
    * - initialized: Has the auth check completed?
    *
    * useAppSelector is our typed hook that knows about RootState.
-   * TypeScript knows:
-   * - user is User | null | undefined
-   * - initialized is boolean
    */
   const { user, initialized } = useAppSelector((state) => state.auth);
 
   /**
-   * Loading State
+   * Read Preferences State from Redux
+   *
+   * We need to know:
+   * - onboardingCompleted: Has the user finished onboarding?
+   * - loading: Are preferences still being fetched from Firestore?
+   *
+   * We check loading because after auth initializes, we load preferences.
+   * We need to wait for that to complete before routing.
+   */
+  const { onboardingCompleted, loading: preferencesLoading } = useAppSelector(
+    (state) => state.userPreferences
+  );
+
+  /**
+   * Loading State - Auth Not Initialized
    *
    * If auth hasn't been initialized yet, show a loading indicator.
    * This prevents the "flash" problem described above.
-   *
-   * This loading screen is very brief (usually < 100ms) because:
-   * - AsyncStorage reads are fast
-   * - If no session, initialized = true quickly
-   * - If session exists, initialized = true with user data
-   *
-   * FUTURE ENHANCEMENT:
-   * You could replace this with a branded splash screen
-   * or animation for a more polished experience.
    */
   if (!initialized) {
     return (
@@ -98,39 +112,51 @@ export default function IndexScreen() {
   }
 
   /**
-   * Redirect Based on Auth State
+   * Not Authenticated → Welcome Screen
    *
-   * Now that we know the auth state for sure:
-   * - user exists → User is logged in → Go to home
-   * - user is null → User is not logged in → Go to welcome
-   *
-   * REDIRECT COMPONENT:
-   * Redirect is a special component from expo-router that:
-   * - Immediately navigates to the specified route
-   * - Replaces the current screen (can't go back to index)
-   * - Works during initial render (no flash of wrong screen)
+   * If no user is logged in, go to the auth flow.
    */
-  if (user) {
-    /**
-     * User is Authenticated
-     *
-     * Redirect to the main app (home screen).
-     * The home screen will show the authenticated user experience.
-     *
-     * The /home route is defined in app/(app)/home.tsx.
-     * It displays:
-     * - User profile data from Firebase Auth
-     * - Sign out button to test the auth flow
-     */
-    return <Redirect href="/home" />;
+  if (!user) {
+    return <Redirect href="/welcome" />;
   }
 
   /**
-   * User is Not Authenticated
+   * Loading State - Preferences Loading
    *
-   * Redirect to the welcome screen to start the auth flow.
+   * User is authenticated but preferences are still being fetched.
+   * We need to wait to know if onboarding is complete.
+   *
+   * This loading is typically brief (< 200ms) but necessary
+   * to avoid incorrectly routing to onboarding for returning users.
    */
-  return <Redirect href="/welcome" />;
+  if (preferencesLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  /**
+   * Authenticated, Onboarding Not Completed → Onboarding Flow
+   *
+   * New users (or users who didn't finish onboarding) go here.
+   * They need to:
+   * 1. Select learning categories
+   * 2. Set daily learning time
+   *
+   * After completing onboarding, they'll be redirected to /home.
+   */
+  if (!onboardingCompleted) {
+    return <Redirect href="/onboarding/category-selection" />;
+  }
+
+  /**
+   * Authenticated, Onboarding Complete → Home Screen
+   *
+   * Returning users who have completed onboarding go directly to the app.
+   */
+  return <Redirect href="/home" />;
 }
 
 /**
@@ -173,88 +199,65 @@ const styles = StyleSheet.create({
  *
  * 2. ROUTE PROTECTION PATTERN
  *    This is a common pattern in web and mobile apps:
- *    - Root screen checks authentication
- *    - Redirects to appropriate section (auth or app)
+ *    - Root screen checks authentication AND onboarding status
+ *    - Redirects to appropriate section (auth, onboarding, or app)
  *    - Prevents unauthorized access
  *    - Creates seamless UX (no manual navigation needed)
  *
  * 3. LOADING STATES
- *    Always handle the loading/initializing state:
- *    - Auth state takes time to initialize (async)
- *    - Show loading screen during initialization
- *    - Prevents redirect flashing (welcome → home)
- *    - Better UX (user sees intentional loading)
+ *    We handle TWO loading states:
+ *    - Auth initialization: Firebase checking for existing session
+ *    - Preferences loading: Fetching onboarding status from Firestore
  *
- * 4. WHY NOT USE ROUTER.PUSH HERE?
- *    router.push can only be called in response to events or in useEffect.
- *    Redirect works during render, making it perfect for this use case.
+ *    Both must complete before we can route correctly.
+ *    This prevents flash (onboarding → home for returning users).
+ *
+ * 4. ONBOARDING FLOW
+ *
+ *    New User:
+ *    1. Sign up/Sign in → auth initializes
+ *    2. loadPreferences → onboardingCompleted: false
+ *    3. Redirect to /onboarding/category-selection
+ *    4. User completes onboarding → savePreferences
+ *    5. onboardingCompleted: true → Redirect to /home
+ *
+ *    Returning User:
+ *    1. App opens → auth initializes (user found)
+ *    2. loadPreferences → onboardingCompleted: true
+ *    3. Redirect directly to /home
  *
  * 5. EXPO ROUTER FILE-BASED ROUTING
  *    File structure creates routes automatically:
  *    - app/index.tsx → "/"
  *    - app/(auth)/welcome.tsx → "/welcome"
  *    - app/(auth)/sign-in.tsx → "/sign-in"
- *    - app/(app)/home.tsx → "/home" (Phase 8)
+ *    - app/(auth)/onboarding/category-selection.tsx → "/onboarding/category-selection"
+ *    - app/(auth)/onboarding/time-selection.tsx → "/onboarding/time-selection"
+ *    - app/(app)/home.tsx → "/home"
  *
- * 6. ROUTE GROUPS
- *    Folders with parentheses like (auth) and (app) are route groups:
- *    - Organize files without affecting URLs
- *    - Can have different layouts
- *    - Useful for conditional rendering
+ * 6. READING FROM MULTIPLE SLICES
  *
- * 7. AUTHENTICATION FLOW WITH REDUX
+ *    We read from two Redux slices:
+ *    const { user, initialized } = useAppSelector(state => state.auth);
+ *    const { onboardingCompleted, loading } = useAppSelector(state => state.userPreferences);
+ *
+ *    The component re-renders when EITHER slice changes.
+ *    This ensures routing is always up-to-date.
+ *
+ * 7. INITIALIZATION SEQUENCE
  *
  *    App Start:
- *    1. RootLayout renders
- *    2. Provider wraps app
- *    3. AppInitializer dispatches initializeAuth()
- *    4. Redux updates: initialized = true, user = User | null
- *
- *    IndexScreen:
- *    1. Reads { user, initialized } from Redux
- *    2. If not initialized → Show loading
- *    3. If initialized → Redirect based on user
- *
- *    Sign In:
- *    1. User enters credentials on /sign-in
- *    2. dispatch(signIn({ email, password }))
- *    3. On success: Redux updates user
- *    4. onAuthStateChange fires → setAuthState()
- *    5. Any component watching user re-renders
- *
- * 8. SELECTOR USAGE
- *
- *    We use useAppSelector to read from Redux:
- *    const { user, initialized } = useAppSelector(state => state.auth);
- *
- *    This component re-renders when auth state changes.
- *    After successful sign-in, user changes, and we redirect to home.
- *
- * 9. COMPARING TO CONTEXT APPROACH
- *
- *    Before (Context):
- *    const { user, initialized } = useAuth();
- *
- *    After (Redux):
- *    const { user, initialized } = useAppSelector(state => state.auth);
- *
- *    Very similar! The main difference is:
- *    - Context: State managed in AuthProvider component
- *    - Redux: State managed in global store
- *    - Redux: DevTools show state changes
- *    - Redux: Easier to add more slices (user profile, settings, etc.)
- *
- * PHASE PROGRESSION:
- * - Phase 5: Build auth screens, auth-based routing ✓
- * - Phase 6: Add sign-up screen ✓
- * - Phase 7: Add password recovery (future)
- * - Phase 8: Implement home screen at /home route ✓
+ *    1. RootLayout renders with Provider
+ *    2. AppInitializer sets up onAuthStateChanged listener
+ *    3. Firebase fires callback with current user (or null)
+ *    4. If user exists, AppInitializer dispatches loadPreferences
+ *    5. IndexScreen waits for both auth.initialized AND !preferencesLoading
+ *    6. Finally, redirect to appropriate screen
  *
  * TESTING:
- * To test the auth flow:
- * 1. App opens → Loading briefly → Redirects to /welcome (if not logged in)
- * 2. Sign in with valid credentials → Redirects to /home
- * 3. Home screen shows user data (email, displayName, uid, etc.)
- * 4. Tap Sign Out → Redirects back to /welcome
- * 5. Close and reopen app → Should stay logged in (session persisted)
+ * To test the complete flow:
+ * 1. New user: Sign up → Goes to onboarding → Complete → Goes to home
+ * 2. Returning user: Open app → Goes directly to home (skips onboarding)
+ * 3. Incomplete onboarding: Start onboarding, close app → Returns to onboarding
+ * 4. Sign out and back in: Goes to home if onboarding was completed
  */

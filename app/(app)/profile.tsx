@@ -37,10 +37,10 @@
  */
 
 import { useRef, useEffect } from 'react';
-import { View, ScrollView, Alert } from 'react-native';
+import { View, ScrollView, Alert, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { CircleUser, Mail, Shield, Key, CheckCircle, XCircle, Settings, LogOut } from 'lucide-react-native';
+import { CircleUser, Mail, Shield, Key, CheckCircle, XCircle, Settings, LogOut, BookOpen, Clock, ChevronRight } from 'lucide-react-native';
 
 // UI Components - Import Avatar and getInitials for profile photo display
 import {
@@ -53,8 +53,16 @@ import {
   CardContent,
   Avatar,
   getInitials,
+  CategoryChip,
+  CategoryChipGroup,
 } from '@/components/ui';
 import type { BottomSheetRef } from '@/components/ui/BottomSheet';
+
+// Preferences helpers - For displaying category and time names
+import {
+  getCategoryDisplayName,
+  PREDEFINED_TIME_OPTIONS,
+} from '@/types/preferences';
 
 // ImagePickerSheet - Bottom sheet for choosing camera vs gallery
 import { ImagePickerSheet } from '@/components/ImagePickerSheet';
@@ -112,6 +120,20 @@ export default function ProfileScreen() {
   const dispatch = useAppDispatch();
   const { user, loading, profileImageLoading, profileImageError } = useAppSelector(
     (state) => state.auth
+  );
+
+  /**
+   * User Preferences State
+   *
+   * We read the user's learning preferences from Redux:
+   * - categories: Array of selected category IDs
+   * - dailyLearningMinutes: Number of minutes per day
+   * - onboardingCompleted: Whether user finished onboarding
+   *
+   * This data is used to display the "Learning Preferences" section.
+   */
+  const { categories, dailyLearningMinutes, onboardingCompleted } = useAppSelector(
+    (state) => state.userPreferences
   );
 
   /**
@@ -273,6 +295,39 @@ export default function ProfileScreen() {
    */
   const isLoadingImage = isImagePickerLoading || profileImageLoading;
 
+  /**
+   * Helper: Get Time Display Label
+   *
+   * Converts the stored minutes value to a user-friendly display string.
+   * First checks predefined options for a matching label, otherwise
+   * formats as "X minutes a day".
+   *
+   * @param minutes - The stored dailyLearningMinutes value
+   * @returns A display-friendly string like "15 minutes a day"
+   */
+  const getTimeDisplayLabel = (minutes: number | null): string => {
+    if (minutes === null) return 'Not set';
+
+    // Check if it matches a predefined option
+    const predefined = PREDEFINED_TIME_OPTIONS.find(opt => opt.minutes === minutes);
+    if (predefined) {
+      return predefined.label;
+    }
+
+    // Custom time: format as "X minutes a day"
+    return `${minutes} minutes a day`;
+  };
+
+  /**
+   * Handle Edit Preferences
+   *
+   * Navigates to the edit preferences screen.
+   * Uses push so user can go back to profile.
+   */
+  const handleEditPreferences = () => {
+    router.push('/edit-preferences');
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       {/**
@@ -424,6 +479,103 @@ export default function ProfileScreen() {
           </Card>
 
           {/**
+           * Learning Preferences Section
+           *
+           * Shows the user's selected learning categories and daily time.
+           * Only displayed if user has completed onboarding.
+           *
+           * PURPOSE:
+           * - Display current learning interests
+           * - Show daily time commitment
+           * - Provide easy access to edit preferences
+           *
+           * DESIGN:
+           * - Card with header and "Edit" button
+           * - Categories shown as display-only chips
+           * - Time shown with clock icon
+           */}
+          {onboardingCompleted && (
+            <Card className="mb-6">
+              <CardHeader>
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center gap-2">
+                    <BookOpen size={20} color={colors.primary} />
+                    <CardTitle>Learning Preferences</CardTitle>
+                  </View>
+                  {/**
+                   * Edit Button
+                   *
+                   * Navigates to the edit preferences screen.
+                   * Uses a Pressable with text for a subtle, inline style.
+                   */}
+                  <Pressable
+                    onPress={handleEditPreferences}
+                    className="flex-row items-center active:opacity-70"
+                    accessibilityRole="button"
+                    accessibilityLabel="Edit learning preferences"
+                  >
+                    <Text className="text-primary font-medium mr-1">Edit</Text>
+                    <ChevronRight size={16} color={colors.primary} />
+                  </Pressable>
+                </View>
+                <CardDescription>
+                  Your personalized learning settings
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="gap-4">
+                {/**
+                 * Categories Display
+                 *
+                 * Shows selected categories as non-interactive chips.
+                 * Uses CategoryChipGroup for consistent layout.
+                 * Chips are "selected" style but not pressable.
+                 */}
+                <View>
+                  <Text variant="small" className="text-muted-foreground mb-2">
+                    Topics you're learning
+                  </Text>
+                  {categories.length > 0 ? (
+                    <CategoryChipGroup>
+                      {categories.map((category) => (
+                        <CategoryChip
+                          key={category}
+                          label={getCategoryDisplayName(category)}
+                          selected
+                          disabled
+                        />
+                      ))}
+                    </CategoryChipGroup>
+                  ) : (
+                    <Text className="text-muted-foreground italic">
+                      No categories selected
+                    </Text>
+                  )}
+                </View>
+
+                {/**
+                 * Daily Time Display
+                 *
+                 * Shows the user's daily learning time commitment.
+                 * Uses clock icon for visual consistency.
+                 */}
+                <View className="flex-row items-center gap-3 pt-2 border-t border-border">
+                  <View className="w-10 h-10 rounded-lg bg-primary/10 items-center justify-center">
+                    <Clock size={20} color={colors.primary} />
+                  </View>
+                  <View>
+                    <Text variant="small" className="text-muted-foreground">
+                      Daily learning time
+                    </Text>
+                    <Text className="font-medium">
+                      {getTimeDisplayLabel(dailyLearningMinutes)}
+                    </Text>
+                  </View>
+                </View>
+              </CardContent>
+            </Card>
+          )}
+
+          {/**
            * Settings Section (Placeholder)
            *
            * Quick access to future settings options.
@@ -435,7 +587,7 @@ export default function ProfileScreen() {
             </CardHeader>
             <CardContent>
               <View className="flex-row items-center py-2">
-                <View className="w-10 h-10 rounded-lg bg-primary-100 items-center justify-center mr-3">
+                <View className="w-10 h-10 rounded-lg bg-primary/10 items-center justify-center mr-3">
                   <Settings size={20} color={colors.primary} />
                 </View>
                 <View className="flex-1">

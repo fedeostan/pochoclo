@@ -43,6 +43,8 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
 import authReducer from './slices/authSlice';
+import userPreferencesReducer from './slices/userPreferencesSlice';
+import contentReducer from './slices/contentSlice';
 
 /**
  * Configure the Redux Store
@@ -68,16 +70,23 @@ export const store = configureStore({
    * - state.auth contains all auth-related state
    * - authReducer handles all auth-related actions
    *
+   * CURRENT SLICES:
+   * - auth: Authentication state (user, loading, error)
+   * - userPreferences: Learning preferences (categories, time, onboarding)
+   * - content: AI-generated learning content (loading, current content, history)
+   *
    * As your app grows, you'll add more slices:
    * {
    *   auth: authReducer,
-   *   user: userReducer,      // User profile data
-   *   movies: moviesReducer,  // Movie data
+   *   userPreferences: userPreferencesReducer,
+   *   content: contentReducer,
    *   settings: settingsReducer, // App settings
    * }
    */
   reducer: {
     auth: authReducer,
+    userPreferences: userPreferencesReducer,
+    content: contentReducer,
   },
 
   /**
@@ -174,26 +183,38 @@ export const store = configureStore({
  * This type represents the entire state tree.
  * TypeScript infers it from the store itself.
  *
- * Example of what it looks like (FIREBASE VERSION):
+ * Example of what it looks like:
  * {
  *   auth: {
- *     user: User | null | undefined;  // Firebase User, no Session!
+ *     user: SerializableUser | null | undefined;
  *     loading: boolean;
  *     initialized: boolean;
  *     error: string | null;
+ *     profileImageLoading: boolean;
+ *     profileImageError: string | null;
+ *   },
+ *   userPreferences: {
+ *     categories: string[];              // e.g., ['technology', 'custom:blockchain']
+ *     dailyLearningMinutes: number | null; // e.g., 15
+ *     onboardingCompleted: boolean;
+ *     loading: boolean;
+ *     saving: boolean;
+ *     error: string | null;
+ *   },
+ *   content: {
+ *     pendingRequestId: string | null;   // UUID of pending request
+ *     isLoading: boolean;                // Waiting for AI content
+ *     currentContent: GeneratedContent | null;
+ *     contentQueue: GeneratedContent[];
+ *     contentHistory: ContentHistoryEntry[];
+ *     error: string | null;
+ *     lastFetchedAt: Date | null;
  *   }
  * }
  *
- * COMPARED TO SUPABASE VERSION:
- * {
- *   auth: {
- *     user: User | null | undefined;
- *     session: Session | null;  // <-- This is GONE in Firebase!
- *     loading: boolean;
- *     initialized: boolean;
- *     error: string | null;
- *   }
- * }
+ * ACCESS IN COMPONENTS:
+ * const { user } = useAppSelector(state => state.auth);
+ * const { categories, onboardingCompleted } = useAppSelector(state => state.userPreferences);
  */
 export type RootState = ReturnType<typeof store.getState>;
 
@@ -255,10 +276,13 @@ export const useAppDispatch = () => useDispatch<AppDispatch>();
  * USAGE:
  * const user = useAppSelector((state) => state.auth.user);
  * // TypeScript knows 'state' is RootState
- * // And knows 'user' is User | null | undefined (Firebase User type!)
+ * // And knows 'user' is SerializableUser | null | undefined
  *
  * You can also destructure:
  * const { user, loading } = useAppSelector((state) => state.auth);
+ *
+ * Access user preferences:
+ * const { categories, onboardingCompleted } = useAppSelector(state => state.userPreferences);
  *
  * NOTE: No more session! Firebase doesn't have sessions in state.
  * If you need tokens, use Firebase's getIdToken() method on the User object.

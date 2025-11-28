@@ -274,10 +274,17 @@ export default function SignUpScreen() {
      * - signUp.fulfilled → user set
      * - signUp.rejected → error set, displayed below
      *
-     * WHY EXPLICIT NAVIGATION?
-     * The Redirect component in index.tsx only evaluates on initial render.
-     * It doesn't re-trigger when Redux state changes mid-session.
-     * So we explicitly navigate after successful sign-up.
+     * WHY NAVIGATE TO "/" INSTEAD OF "/home"?
+     * New users need to complete onboarding first!
+     * The root index.tsx handles routing based on BOTH auth state AND
+     * onboarding status. By navigating to "/", we let it decide:
+     * - Since this is a new user → onboardingCompleted: false
+     * - Index will redirect to /onboarding/category-selection
+     * - After completing onboarding → user goes to /home
+     *
+     * This ensures every new user goes through onboarding to:
+     * - Select their learning categories
+     * - Set their daily learning time
      *
      * DISPLAY NAME:
      * We trim whitespace and only send if not empty.
@@ -291,8 +298,8 @@ export default function SignUpScreen() {
           displayName: displayName.trim() || undefined,
         })
       ).unwrap();
-      // Success! Navigate to home screen
-      router.replace('/home');
+      // Success! Navigate to root for proper routing (will go to onboarding)
+      router.replace('/');
     } catch {
       // Error is already set in Redux state by the rejected action
       // The UI will display it automatically via authError

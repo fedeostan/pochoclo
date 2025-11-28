@@ -45,6 +45,10 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { store, useAppDispatch } from "../src/store";
 import { setAuthState } from "../src/store/slices/authSlice";
+import {
+  loadPreferences,
+  clearPreferences,
+} from "../src/store/slices/userPreferencesSlice";
 
 /**
  * Global CSS Import
@@ -66,7 +70,9 @@ import { auth } from "../src/config/firebase";
 /**
  * AppInitializer Component
  *
- * This component handles auth initialization and state syncing.
+ * This component handles auth initialization, state syncing, and
+ * loading user preferences when authenticated.
+ *
  * It must be INSIDE the Provider so it can use Redux hooks.
  *
  * WHY A SEPARATE COMPONENT?
@@ -85,7 +91,16 @@ import { auth } from "../src/config/firebase";
  *    - Fires immediately with current user (or null) on subscription
  *    - Continues to fire on auth state changes
  *
- * This is simpler! One listener handles everything.
+ * PREFERENCES LOADING:
+ * When a user is authenticated, we also need to load their preferences
+ * from Firestore. This includes their onboarding status, which determines
+ * whether they should see the onboarding flow or the main app.
+ *
+ * FLOW:
+ * 1. onAuthStateChanged fires with user
+ * 2. If user: dispatch loadPreferences(user.uid)
+ * 3. If no user: dispatch clearPreferences()
+ * 4. IndexScreen reads both auth and preferences state for routing
  */
 function AppInitializer({ children }: { children: React.ReactNode }) {
   /**
@@ -103,16 +118,13 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
    * We set up a single listener that handles:
    * 1. Initial auth state check (user might already be logged in)
    * 2. Ongoing auth state changes (sign in, sign out, token refresh)
+   * 3. Loading user preferences when authenticated
    *
    * FIREBASE'S onAuthStateChanged BEHAVIOR:
    * - Fires IMMEDIATELY with current auth state when subscribed
    * - If user is logged in: fires with User object
    * - If user is not logged in: fires with null
    * - Continues to fire whenever auth state changes
-   *
-   * This is different from Supabase where we needed:
-   * - getSession() for initial state
-   * - onAuthStateChange() for subsequent changes
    *
    * WHEN DOES IT FIRE?
    * - App starts (immediate callback with current state)
@@ -122,9 +134,14 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
    * - User account is deleted or disabled
    *
    * WHAT WE DO:
-   * Dispatch setAuthState with the user (or null).
-   * This updates Redux state and sets initialized = true.
-   * The app then knows whether to show auth screens or main content.
+   * 1. Dispatch setAuthState with the user (or null)
+   * 2. If user exists: Load their preferences from Firestore
+   * 3. If no user: Clear preferences (prevent data leakage between users)
+   *
+   * ERROR HANDLING:
+   * If preferences fail to load, we log the error but don't block the app.
+   * The user will be routed based on fallback state (assumes not onboarded).
+   * This is graceful degradation - the app remains functional.
    */
   useEffect(() => {
     /**
@@ -136,26 +153,8 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
      * The callback receives:
      * - user: Firebase User object if signed in
      * - user: null if not signed in
-     *
-     * COMPARISON TO SUPABASE:
-     *
-     * Supabase:
-     * const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-     *   dispatch(setAuthState({ user: session?.user ?? null, session }));
-     * });
-     *
-     * Firebase:
-     * const unsubscribe = onAuthStateChanged(auth, (user) => {
-     *   dispatch(setAuthState({ user }));
-     * });
-     *
-     * Key differences:
-     * - Firebase passes auth instance as first argument
-     * - Firebase callback receives user directly (not event + session)
-     * - No session object to manage - Firebase handles tokens internally!
-     * - Simpler cleanup: just call unsubscribe()
      */
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       /**
        * Auth State Changed
        *
@@ -174,10 +173,59 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
        * setAuthState will:
        * - Update state.auth.user with the user (or null)
        * - Set state.auth.initialized to true
-       *
-       * This triggers navigation to show the right screens.
        */
       dispatch(setAuthState({ user }));
+
+      /**
+       * Load or Clear Preferences Based on Auth State
+       *
+       * When user is authenticated:
+       * - Load their preferences from Firestore
+       * - This includes onboardingCompleted status for routing
+       * - Categories and dailyLearningMinutes for personalization
+       *
+       * When user is not authenticated:
+       * - Clear preferences from Redux
+       * - This prevents data from one user showing for another
+       * - Reset to initial state for fresh start
+       *
+       * WHY IS THIS IMPORTANT?
+       * Without loading preferences:
+       * - IndexScreen wouldn't know if user completed onboarding
+       * - Every user would be sent to onboarding, even returning users
+       *
+       * Without clearing preferences:
+       * - If User A logs out and User B logs in
+       * - User B might see User A's categories temporarily
+       *
+       * ERROR HANDLING:
+       * If loadPreferences fails (network error, permissions, etc.):
+       * - The error is stored in Redux state
+       * - The app continues with fallback behavior (onboardingCompleted: false)
+       * - This means returning users might see onboarding again
+       * - But the app doesn't crash - graceful degradation
+       *
+       * We use try/catch with .unwrap() to handle errors explicitly
+       * rather than letting them fail silently.
+       */
+      if (user) {
+        // User is authenticated - load their preferences
+        try {
+          await dispatch(loadPreferences(user.uid)).unwrap();
+        } catch (error) {
+          // Log error but don't crash - graceful degradation
+          // The error is already stored in Redux state by the rejected handler
+          // The user will be routed based on fallback state (onboardingCompleted: false)
+          console.error(
+            'Failed to load user preferences:',
+            error,
+            '\nUser may see onboarding flow again. This is a temporary issue.'
+          );
+        }
+      } else {
+        // User signed out - clear preferences
+        dispatch(clearPreferences());
+      }
     });
 
     /**
@@ -187,10 +235,6 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
      * we unsubscribe from the auth listener to prevent memory leaks.
      *
      * This is a React best practice: always clean up subscriptions.
-     *
-     * COMPARISON TO SUPABASE:
-     * - Supabase: subscription.unsubscribe()
-     * - Firebase: unsubscribe() (the returned function)
      */
     return () => {
       unsubscribe();

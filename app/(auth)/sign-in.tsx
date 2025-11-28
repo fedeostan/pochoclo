@@ -204,13 +204,22 @@ export default function SignInScreen() {
      * - Throws the rejected value if failed
      *
      * This lets us use try/catch to handle success/failure.
-     * On success, we navigate to /home.
+     * On success, we navigate to "/" (root).
      * On failure, Redux already set the error, so we don't need to do anything.
+     *
+     * WHY NAVIGATE TO "/" INSTEAD OF "/home"?
+     * The root index.tsx handles routing based on BOTH auth state AND
+     * onboarding status. By navigating to "/", we let it decide:
+     * - If onboarding is complete → /home
+     * - If onboarding is incomplete → /onboarding/category-selection
+     *
+     * This ensures new users go through onboarding, while returning
+     * users (who previously signed out) go directly to home.
      */
     try {
       await dispatch(signIn({ email, password })).unwrap();
-      // Success! Navigate to home screen
-      router.replace('/home');
+      // Success! Navigate to root for proper routing
+      router.replace('/');
     } catch {
       // Error is already set in Redux state by the rejected action
       // The UI will display it automatically via authError

@@ -62,3 +62,10 @@ export type { BottomSheetProps, BottomSheetRef } from "./BottomSheet";
 // Media & Avatars
 export { Avatar, getInitials } from "./Avatar";
 export type { AvatarProps, AvatarSize } from "./Avatar";
+
+// Selection Components (for Onboarding & Preferences)
+export { CategoryChip, CategoryChipGroup } from "./CategoryChip";
+export type { CategoryChipProps, CategoryChipGroupProps } from "./CategoryChip";
+
+export { TimeOptionCard, TimeOptionCardGroup } from "./TimeOptionCard";
+export type { TimeOptionCardProps, TimeOptionCardGroupProps } from "./TimeOptionCard";

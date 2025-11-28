@@ -1,0 +1,114 @@
+/**
+ * Firestore Security Rules for POCHOCLO
+ *
+ * These rules control who can read/write data in our Firestore database.
+ *
+ * SECURITY MODEL:
+ * - Users can only access their own data (userId must match auth UID)
+ * - Subcollections inherit parent security context
+ * - n8n writes via Firebase Admin SDK (bypasses rules)
+ *
+ * LEARNING NOTE:
+ * Security rules are the LAST line of defense. They run on Firebase servers
+ * and cannot be bypassed by malicious client code. Always assume client
+ * code can be modified - rules must enforce security.
+ */
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * Users Collection
+     *
+     * Path: /users/{userId}
+     *
+     * Each user has their own document containing profile data.
+     * Users can only read/write their own document.
+     */
+    match /users/{userId} {
+      // User can read/write their own document
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      /**
+       * Generated Content Subcollection
+       *
+       * Path: /users/{userId}/generatedContent/{requestId}
+       *
+       * Stores AI-generated content for each user.
+       * - User can READ their own content
+       * - WRITE is allowed for authenticated user OR service account
+       *   (n8n uses Firebase Admin which bypasses rules anyway)
+       *
+       * DOCUMENT STRUCTURE:
+       * {
+       *   requestId: string,
+       *   status: "processing" | "completed" | "error",
+       *   content: { title, summary, body, ... },
+       *   topicSummary: string,
+       *   generatedAt: timestamp,
+       *   error: string | null
+       * }
+       */
+      match /generatedContent/{requestId} {
+        // User can read their own generated content
+        allow read: if request.auth != null && request.auth.uid == userId;
+
+        // User can write (for now - n8n Admin SDK bypasses this anyway)
+        // In production, you might restrict this to only allow updates
+        // with specific status transitions
+        allow write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      /**
+       * Content History Subcollection
+       *
+       * Path: /users/{userId}/contentHistory/{historyId}
+       *
+       * Tracks what content the user has viewed for anti-repetition.
+       *
+       * DOCUMENT STRUCTURE:
+       * {
+       *   requestId: string,
+       *   topicSummary: string,
+       *   category: string,
+       *   generatedAt: timestamp,
+       *   viewed: boolean,
+       *   saved: boolean
+       * }
+       */
+      match /contentHistory/{historyId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      /**
+       * Saved Content Subcollection
+       *
+       * Path: /users/{userId}/savedContent/{contentId}
+       *
+       * Stores bookmarked/saved content for later reference.
+       * Users can save content they want to revisit.
+       *
+       * DOCUMENT STRUCTURE:
+       * {
+       *   content: { title, summary, body, ... },
+       *   requestId: string,
+       *   savedAt: timestamp,
+       *   notes?: string
+       * }
+       */
+      match /savedContent/{contentId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      /**
+       * User Preferences Subcollection (if used)
+       *
+       * Path: /users/{userId}/preferences/{prefId}
+       */
+      match /preferences/{prefId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+  }
+}
