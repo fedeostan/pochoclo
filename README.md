@@ -1,405 +1,299 @@
-# POCHOCLO - React Native Learning Project
+# POCHOCLO - Proyecto de Aprendizaje React Native
 
-Welcome to POCHOCLO! This is a learning-focused mobile app project designed to teach you React Native development from the ground up.
+Bienvenido a POCHOCLO! Esta es una aplicación móvil de descubrimiento de películas y series enfocada en el aprendizaje, diseñada para enseñarte desarrollo en React Native desde cero.
 
-## 🎯 Project Purpose
+## Sobre la Aplicación
 
-This is an **educational project** built to help you learn:
-- **React Native**: Build mobile apps using React
-- **TypeScript**: Write type-safe JavaScript code
-- **Expo**: Streamlined React Native development
-- **Supabase**: Backend services (database, authentication, storage)
+POCHOCLO es una app de entretenimiento que te ayuda a:
+- Descubrir películas y series populares
+- Obtener recomendaciones personalizadas basadas en tus gustos
+- Guardar tu contenido favorito en watchlists
+- Explorar por géneros, tendencias y más
 
-Every file in this project contains extensive comments explaining **why** and **how** things work, not just what the code does.
+## Propósito del Proyecto
 
-## 📚 What Makes This Project Special
+Este es un **proyecto educativo** construido para ayudarte a aprender:
+- **React Native**: Construir apps móviles usando React
+- **TypeScript**: Escribir código JavaScript con tipado seguro
+- **Expo**: Desarrollo simplificado de React Native
+- **Firebase**: Servicios de backend (base de datos, autenticación, almacenamiento)
+- **NativeWind**: Estilos con Tailwind CSS para React Native
 
-- **Teaching-First Approach**: Code is heavily commented with educational explanations
-- **Progressive Learning**: Start simple, add complexity as you learn
-- **Real-World Patterns**: Learn industry best practices from the start
-- **Comprehensive Comments**: Understand the "why" behind every decision
+Cada archivo en este proyecto contiene comentarios extensos explicando **por qué** y **cómo** funcionan las cosas, no solo qué hace el código.
 
-## 🛠 Tech Stack
+## Qué Hace Este Proyecto Especial
 
-| Technology | Purpose | Why We Use It |
-|------------|---------|---------------|
-| **React Native** | Mobile framework | Write once, run on iOS & Android |
-| **TypeScript** | Language | Catch errors early with type safety |
-| **Expo** | Development platform | Simplified setup, excellent tooling |
-| **Supabase** | Backend service | Database, auth, storage without managing servers |
+- **Enfoque en la Enseñanza**: El código está muy comentado con explicaciones educativas
+- **Aprendizaje Progresivo**: Comienza simple, añade complejidad mientras aprendes
+- **Patrones del Mundo Real**: Aprende las mejores prácticas de la industria desde el inicio
+- **Comentarios Completos**: Entiende el "por qué" detrás de cada decisión
 
-## 📁 Project Structure
+## Stack Tecnológico
+
+| Tecnología | Propósito | Por Qué la Usamos |
+|------------|-----------|-------------------|
+| **React Native** | Framework móvil | Escribe una vez, ejecuta en iOS y Android |
+| **TypeScript** | Lenguaje | Detecta errores temprano con tipado seguro |
+| **Expo** | Plataforma de desarrollo | Configuración simplificada, excelentes herramientas |
+| **Firebase** | Servicio de backend | Base de datos, auth, almacenamiento sin manejar servidores |
+| **NativeWind** | Estilos | Tailwind CSS para React Native |
+
+## Estructura del Proyecto
 
 ```
 POCHOCLO/
-├── App.tsx                 # Main entry point (root component)
-├── claude.md               # Guidelines for educational code
-├── .env.example            # Template for environment variables
-├── package.json            # Project dependencies
-├── tsconfig.json           # TypeScript configuration
+├── app/                    # Pantallas de la app (Expo Router)
+│   ├── (tabs)/            # Navegación por pestañas
+│   │   ├── index.tsx      # Pantalla de inicio (Home)
+│   │   ├── discover.tsx   # Descubrir contenido
+│   │   ├── watchlist.tsx  # Lista de seguimiento
+│   │   └── profile.tsx    # Perfil del usuario
+│   ├── (auth)/            # Pantallas de autenticación
+│   │   ├── login.tsx      # Inicio de sesión
+│   │   └── register.tsx   # Registro
+│   └── (onboarding)/      # Flujo de onboarding
 │
-└── src/                    # Source code folder
-    ├── screens/            # App screens (pages)
-    │   └── HomeScreen.tsx  # Main home screen
-    │
-    ├── components/         # Reusable UI components
-    │   └── Button.tsx      # Example reusable button component
-    │
-    ├── config/             # Configuration files
-    │   └── supabase.ts     # Supabase client setup
-    │
-    ├── theme/              # Design system (NEW!)
-    │   ├── colors.ts       # Color palette
-    │   ├── spacing.ts      # Spacing scale (8pt grid)
-    │   ├── typography.ts   # Text styles & fonts
-    │   ├── radius.ts       # Border radius values
-    │   ├── shadows.ts      # Shadow/elevation styles
-    │   ├── animations.ts   # Animation timing
-    │   ├── icons.ts        # Icon sizes
-    │   ├── types.ts        # TypeScript definitions
-    │   └── index.ts        # Central export
-    │
-    └── types/              # TypeScript type definitions
+├── components/            # Componentes reutilizables
+│   ├── ui/               # Componentes de UI base
+│   └── ...               # Componentes específicos
+│
+├── services/             # Lógica de negocio y APIs
+│   ├── firebase.ts       # Configuración de Firebase
+│   ├── tmdb.ts          # API de películas (TMDB)
+│   └── content.ts       # Servicio de contenido
+│
+├── hooks/                # Hooks personalizados de React
+├── contexts/             # Contextos de React (estado global)
+├── types/                # Definiciones de tipos TypeScript
+└── constants/            # Constantes y configuración
 ```
 
-## 🎨 Design System
+## Sistema de Diseño
 
-This project includes a **professional design system** - a collection of reusable design tokens that ensure consistency across your app!
+**IMPORTANTE**: Toda la UI sigue el sistema de diseño definido en `UI_RULES.md`.
 
-### What is a Design System?
+### Referencia Rápida
 
-Instead of hardcoding values like `fontSize: 16` or `color: '#6200EE'` everywhere, you use semantic names like `body.regular` and `colors.primary`. This makes your code:
-- **Consistent**: All screens use the same values
-- **Maintainable**: Change once, updates everywhere
-- **Readable**: `colors.primary` is clearer than `'#6200EE'`
-- **Professional**: Industry-standard approach
+**Colores**
+- Fondo: `bg-background` (#FAFAF9 - blanco cálido)
+- Primario: `bg-primary` / `text-primary` (#6B8E7B - verde salvia suave)
+- Texto: `text-foreground` (#1C1917 - gris oscuro)
+- Atenuado: `text-muted-foreground` (#78716C)
 
-### Design Tokens Included
+**Principios Fundamentales**
+- MINIMAL: Sin elementos innecesarios, abraza el espacio en blanco
+- LIGERO: Solo tema claro, fondos blancos cálidos
+- SUAVE: Colores atenuados, sin tonos vibrantes
+- MODERNO: Esquinas redondeadas (12px), tipografía limpia
 
-| Category | File | What It Contains |
-|----------|------|------------------|
-| **Colors** | `colors.ts` | Brand colors, text colors, backgrounds, state colors (success/error/warning) |
-| **Spacing** | `spacing.ts` | 8-point grid system (4, 8, 12, 16, 24, 32, 48, 64px) |
-| **Typography** | `typography.ts` | Font sizes, weights, line heights, pre-styled text (headings, body, captions) |
-| **Radius** | `radius.ts` | Border radius values for rounded corners (buttons, cards, etc.) |
-| **Shadows** | `shadows.ts` | Elevation styles for iOS and Android (creates depth) |
-| **Animations** | `animations.ts` | Duration constants and easing curves for smooth transitions |
-| **Icons** | `icons.ts` | Standard icon sizes and touch target guidelines |
+**Siempre Usa Componentes de UI**
+```tsx
+import { Button, Input, Text, Card } from "@/components/ui";
 
-### Quick Example
-
-**Before (hardcoded values):**
-```typescript
-const styles = StyleSheet.create({
-  button: {
-    backgroundColor: '#6200EE',     // ❌ What color is this?
-    padding: 20,                    // ❌ Why 20? Why not 16 or 24?
-    borderRadius: 12,               // ❌ Inconsistent across app
-    fontSize: 16,                   // ❌ Too many magic numbers!
-  }
-});
+// NO usar primitivos de React Native directamente para elementos estilizados
 ```
 
-**After (using design system):**
-```typescript
-import { colors, spacing, radius, body } from '../theme';
+## Comenzando
 
-const styles = StyleSheet.create({
-  button: {
-    backgroundColor: colors.primary,  // ✅ Semantic & consistent
-    padding: spacing.lg,              // ✅ Part of 8pt grid
-    borderRadius: radius.md,          // ✅ Matches other components
-    ...body.regular,                  // ✅ Pre-styled text
-  }
-});
-```
+### Prerrequisitos
 
-### How to Use the Design System
+Antes de comenzar, asegúrate de tener:
 
-**Import what you need:**
-```typescript
-import {
-  colors,      // Color palette
-  spacing,     // Spacing values
-  headings,    // Heading text styles
-  body,        // Body text styles
-  radius,      // Border radius
-  shadowSm,    // Small shadow
-} from '../theme';
-```
+1. **Node.js** (v18 o más reciente)
+   - Descargar: https://nodejs.org/
+   - Verificar versión: `node --version`
 
-**Use in your components:**
-```typescript
-<View style={{
-  backgroundColor: colors.surface,
-  padding: spacing.lg,
-  borderRadius: radius.md,
-  ...shadowSm,
-}}>
-  <Text style={[headings.h1, { color: colors.primary }]}>
-    Hello World!
-  </Text>
-</View>
-```
+2. **npm** (viene con Node.js)
+   - Verificar versión: `npm --version`
 
-### Learning the Design System
+3. **Git** (para control de versiones)
+   - Descargar: https://git-scm.com/
+   - Verificar versión: `git --version`
 
-Each theme file is **extensively documented** with:
-- What each value is for
-- When to use it
-- Why it exists
-- Real-world examples
-- Design principles explained
+4. **Emulador Móvil** (elige uno o ambos):
+   - **Simulador iOS**: Solo macOS, requiere Xcode
+   - **Android Studio**: Windows, macOS o Linux
 
-**Start here:**
-1. Read `src/theme/colors.ts` - Learn about color systems
-2. Read `src/theme/spacing.ts` - Understand the 8-point grid
-3. Read `src/theme/typography.ts` - See how text hierarchy works
-4. Look at `src/screens/HomeScreen.tsx` - See it in action!
-5. Study `src/components/Button.tsx` - Reusable component example
+### Pasos de Instalación
 
-### Try This!
-
-1. Go to `src/theme/colors.ts`
-2. Change `primary: '#6200EE'` to `primary: '#FF5722'` (orange)
-3. Save and watch the app update instantly
-4. The header, button, and counter all change color automatically!
-5. **That's the power of a design system!** 🎉
-
-### Design System Benefits
-
-✅ **No more guessing** - Clear options for every value
-✅ **Consistent look** - All screens feel cohesive
-✅ **Easy to change** - Rebrand in minutes
-✅ **Type-safe** - TypeScript catches typos
-✅ **Self-documenting** - Code explains itself
-✅ **Professional** - Industry best practices
-✅ **Scalable** - Grow without chaos
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-Before you begin, make sure you have:
-
-1. **Node.js** (v18 or newer)
-   - Download: https://nodejs.org/
-   - Check version: `node --version`
-
-2. **npm** (comes with Node.js)
-   - Check version: `npm --version`
-
-3. **Git** (for version control)
-   - Download: https://git-scm.com/
-   - Check version: `git --version`
-
-4. **Mobile Emulator** (choose one or both):
-   - **iOS Simulator**: macOS only, requires Xcode
-   - **Android Studio**: Windows, macOS, or Linux
-
-### Installation Steps
-
-1. **Clone or navigate to this project**
+1. **Clona o navega a este proyecto**
    ```bash
    cd POCHOCLO
    ```
 
-2. **Install dependencies**
+2. **Instala las dependencias**
    ```bash
    npm install
    ```
-   This downloads all required packages (React Native, Expo, Supabase, etc.)
+   Esto descarga todos los paquetes necesarios (React Native, Expo, Firebase, etc.)
 
-3. **Set up environment variables** (optional for now)
+3. **Configura las variables de entorno**
    ```bash
    cp .env.example .env
    ```
-   Then edit `.env` with your Supabase credentials (see Supabase Setup below)
+   Luego edita `.env` con tus credenciales de Firebase y TMDB
 
-4. **Start the development server**
+4. **Inicia el servidor de desarrollo**
    ```bash
    npm start
    ```
-   This launches Expo DevTools in your browser
+   Esto lanza Expo DevTools en tu navegador
 
-## 📱 Running on Emulators
+## Ejecutando en Emuladores
 
-### Option 1: iOS Simulator (macOS only)
+### Opción 1: Simulador iOS (solo macOS)
 
-1. **Install Xcode** from the Mac App Store
-2. **Open Xcode** at least once to complete setup
-3. **Install Command Line Tools**:
-   ```bash
-   xcode-select --install
-   ```
-4. **Run the app**:
-   - Start the dev server: `npm start`
-   - Press `i` in the terminal
-   - Or scan the QR code with the Camera app on your iPhone
+1. **Instala Xcode** desde la Mac App Store
+2. **Abre Xcode** al menos una vez para completar la configuración
+3. **Ejecuta la app**:
+   - Inicia el servidor: `npm start`
+   - Presiona `i` en la terminal
 
-### Option 2: Android Emulator
+### Opción 2: Emulador Android
 
-1. **Install Android Studio**
-   - Download: https://developer.android.com/studio
+1. **Instala Android Studio**
+   - Descargar: https://developer.android.com/studio
 
-2. **Set up an Android Virtual Device (AVD)**:
-   - Open Android Studio
-   - Go to Tools → Device Manager
-   - Click "Create Device"
-   - Choose a device (Pixel 5 recommended)
-   - Download a system image (API 33+ recommended)
-   - Finish setup
+2. **Configura un Android Virtual Device (AVD)**:
+   - Abre Android Studio
+   - Ve a Tools → Device Manager
+   - Haz clic en "Create Device"
+   - Elige un dispositivo (Pixel 5 recomendado)
+   - Descarga una imagen del sistema (API 33+ recomendado)
 
-3. **Run the app**:
-   - Start the dev server: `npm start`
-   - Press `a` in the terminal
-   - Or scan the QR code with the Expo Go app
+3. **Ejecuta la app**:
+   - Inicia el servidor: `npm start`
+   - Presiona `a` en la terminal
 
-### Option 3: Physical Device
+### Opción 3: Dispositivo Físico
 
-1. **Install Expo Go app** on your phone:
+1. **Instala la app Expo Go** en tu teléfono:
    - iOS: https://apps.apple.com/app/expo-go/id982107779
    - Android: https://play.google.com/store/apps/details?id=host.exp.exponent
 
-2. **Connect to same WiFi** as your computer
+2. **Conéctate a la misma WiFi** que tu computadora
 
-3. **Scan the QR code** shown in the terminal or browser
+3. **Escanea el código QR** mostrado en la terminal o navegador
 
-## 🗄 Supabase Setup (Optional - For Backend Features)
+## Configuración de Firebase
 
-When you're ready to add backend functionality (database, authentication):
+### 1. Crea una Cuenta de Firebase
 
-### 1. Create a Supabase Account
+1. Ve a https://console.firebase.google.com
+2. Regístrate (nivel gratuito disponible)
+3. Crea un nuevo proyecto
 
-1. Go to https://supabase.com
-2. Sign up (free tier available)
-3. Create a new project
+### 2. Obtén tus Credenciales
 
-### 2. Get Your Credentials
+1. En el dashboard de tu proyecto Firebase
+2. Ve a Configuración del proyecto
+3. Añade una app (Web, iOS o Android)
+4. Copia los valores de configuración
 
-1. In your Supabase project dashboard
-2. Go to Settings (⚙️) → API
-3. Copy these values:
-   - **Project URL**: Your Supabase project URL
-   - **anon/public key**: Your public API key
+### 3. Configura tu App
 
-### 3. Configure Your App
+Añade tus credenciales a `.env`:
+```env
+EXPO_PUBLIC_FIREBASE_API_KEY=tu-api-key
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=tu-proyecto.firebaseapp.com
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=tu-proyecto
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=tu-proyecto.appspot.com
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=tu-sender-id
+EXPO_PUBLIC_FIREBASE_APP_ID=tu-app-id
+```
 
-1. Create a `.env` file (if you haven't):
-   ```bash
-   cp .env.example .env
-   ```
+## Configuración de TMDB (API de Películas)
 
-2. Add your credentials to `.env`:
-   ```env
-   EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-   EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
-   ```
+1. Crea una cuenta en https://www.themoviedb.org/
+2. Ve a Configuración → API
+3. Solicita una API key
+4. Añade a `.env`:
+```env
+EXPO_PUBLIC_TMDB_API_KEY=tu-tmdb-api-key
+```
 
-3. **Restart the dev server** (Ctrl+C, then `npm start`)
+## Comandos Disponibles
 
-### 4. Create Your First Table
-
-1. In Supabase dashboard, go to Table Editor
-2. Click "New Table"
-3. Try creating a simple table (e.g., "notes" with columns: id, title, content)
-
-## 📝 Available Commands
-
-| Command | Description |
+| Comando | Descripción |
 |---------|-------------|
-| `npm start` | Start Expo development server |
-| `npm run android` | Run on Android emulator |
-| `npm run ios` | Run on iOS simulator (macOS only) |
-| `npm run web` | Run in web browser (experimental) |
-| `npm test` | Run tests (when you add them) |
+| `npm start` | Inicia el servidor de desarrollo de Expo |
+| `npm run android` | Ejecuta en emulador Android |
+| `npm run ios` | Ejecuta en simulador iOS (solo macOS) |
+| `npm run web` | Ejecuta en navegador web (experimental) |
+| `npm test` | Ejecuta tests |
 
-## 🎓 Learning Path
+## Ruta de Aprendizaje
 
-### Level 1: Getting Started (You Are Here!)
-- ✅ Set up development environment
-- ✅ Run app on emulator
-- ✅ Understand project structure
-- 🎯 Next: Explore HomeScreen.tsx and understand the code
+### Nivel 1: Comenzando
+- Configura el entorno de desarrollo
+- Ejecuta la app en un emulador
+- Entiende la estructura del proyecto
 
-### Level 2: React Native Basics
-- Understand components and JSX
-- Learn about state with useState
-- Style components with StyleSheet
-- Handle user input and events
+### Nivel 2: Fundamentos de React Native
+- Entiende componentes y JSX
+- Aprende sobre estado con useState
+- Estiliza componentes con NativeWind
+- Maneja entrada de usuario y eventos
 
-### Level 3: TypeScript Integration
-- Learn TypeScript basics
-- Understand type annotations
-- Use interfaces and types
-- Catch errors at compile time
+### Nivel 3: Integración con TypeScript
+- Aprende los básicos de TypeScript
+- Entiende las anotaciones de tipos
+- Usa interfaces y tipos
+- Detecta errores en tiempo de compilación
 
-### Level 4: Navigation
-- Add React Navigation
-- Create multiple screens
-- Navigate between screens
-- Pass data between screens
+### Nivel 4: Navegación
+- Usa Expo Router
+- Crea múltiples pantallas
+- Navega entre pantallas
+- Pasa datos entre pantallas
 
-### Level 5: Supabase Integration
-- Connect to Supabase
-- Perform CRUD operations
-- Add user authentication
-- Handle real-time data
+### Nivel 5: Integración con Firebase
+- Conéctate a Firebase
+- Realiza operaciones CRUD con Firestore
+- Añade autenticación de usuarios
+- Maneja almacenamiento de archivos
 
-### Level 6: Advanced Topics
-- State management (Context API, Redux)
-- Custom hooks
-- Performance optimization
-- Publishing to app stores
+### Nivel 6: Temas Avanzados
+- Gestión de estado (Context API)
+- Hooks personalizados
+- Optimización de rendimiento
+- Publicación en tiendas de apps
 
-## 🔍 Code Exploration Guide
+## Guía de Exploración del Código
 
-Start by reading these files in order:
+Empieza leyendo estos archivos en orden:
 
-1. **App.tsx**
-   - Entry point of the application
-   - Shows how the app initializes
+1. **app/(tabs)/index.tsx** - Pantalla de inicio, componentes básicos
+2. **services/firebase.ts** - Configuración del backend
+3. **components/ui/** - Sistema de componentes reutilizables
+4. **hooks/** - Hooks personalizados para lógica compartida
+5. **CLAUDE.md** - Filosofía de enseñanza y estándares de código
 
-2. **src/screens/HomeScreen.tsx**
-   - Your first React Native component
-   - Learn about JSX, state, styling
-   - See interactive examples
+## Conceptos Clave a Entender
 
-3. **src/config/supabase.ts**
-   - Backend configuration
-   - Environment variables
-   - Security best practices
+### Componentes
+Los componentes son los bloques de construcción de las apps React Native. Piensa en ellos como piezas reutilizables de UI.
 
-4. **claude.md**
-   - Teaching philosophy
-   - Code commenting standards
-   - Learning guidelines
-
-## 💡 Key Concepts to Understand
-
-### Components
-Components are the building blocks of React Native apps. Think of them as reusable pieces of UI.
-
-### State
-State is data that can change over time. When state changes, React re-renders the component.
+### Estado (State)
+El estado son datos que pueden cambiar con el tiempo. Cuando el estado cambia, React re-renderiza el componente.
 
 ### Props
-Props (properties) are how parent components pass data to child components.
+Las props (propiedades) son cómo los componentes padre pasan datos a los componentes hijo.
 
 ### JSX
-JSX is syntax that looks like HTML but is actually JavaScript. It describes what the UI should look like.
+JSX es sintaxis que parece HTML pero en realidad es JavaScript. Describe cómo debería verse la UI.
 
-### TypeScript Types
-Types help catch errors before you run the code. They document what kind of data is expected.
+### Tipos de TypeScript
+Los tipos ayudan a detectar errores antes de ejecutar el código. Documentan qué tipo de datos se esperan.
 
-## 🐛 Troubleshooting
+## Solución de Problemas
 
-### "Metro bundler can't connect"
-- Make sure you're on the same WiFi network
-- Try restarting with: `npm start -- --reset-cache`
+### "Metro bundler no puede conectarse"
+- Asegúrate de estar en la misma red WiFi
+- Intenta reiniciar con: `npm start -- --reset-cache`
 
 ### "Unable to resolve module"
-- Clear cache and reinstall:
+- Limpia caché y reinstala:
   ```bash
   rm -rf node_modules
   npm install
@@ -407,61 +301,61 @@ Types help catch errors before you run the code. They document what kind of data
   ```
 
 ### "Xcode not found"
-- Install Xcode from the Mac App Store
-- Run: `sudo xcode-select --switch /Applications/Xcode.app`
+- Instala Xcode desde la Mac App Store
+- Ejecuta: `sudo xcode-select --switch /Applications/Xcode.app`
 
-### Environment variables not working
-- Must start with `EXPO_PUBLIC_`
-- Restart dev server after changing .env
-- Clear cache: `npm start -- --reset-cache`
+### Variables de entorno no funcionan
+- Deben empezar con `EXPO_PUBLIC_`
+- Reinicia el servidor de desarrollo después de cambiar .env
+- Limpia caché: `npm start -- --reset-cache`
 
-## 📖 Learning Resources
+## Recursos de Aprendizaje
 
-### Official Documentation
+### Documentación Oficial
 - **React Native**: https://reactnative.dev/
 - **Expo**: https://docs.expo.dev/
 - **TypeScript**: https://www.typescriptlang.org/docs/
-- **Supabase**: https://supabase.com/docs
+- **Firebase**: https://firebase.google.com/docs
 
-### Recommended Tutorials
+### Tutoriales Recomendados
 - Expo Getting Started: https://docs.expo.dev/get-started/introduction/
 - React Native Basics: https://reactnative.dev/docs/tutorial
-- TypeScript for Beginners: https://www.typescriptlang.org/docs/handbook/typescript-from-scratch.html
+- TypeScript para Principiantes: https://www.typescriptlang.org/docs/handbook/typescript-from-scratch.html
 
-### Community
+### Comunidad
 - React Native Discord: https://discord.gg/react-native-community
 - Expo Discord: https://discord.gg/expo
 - Stack Overflow: https://stackoverflow.com/questions/tagged/react-native
 
-## 🤝 How to Learn Effectively
+## Cómo Aprender Efectivamente
 
-1. **Read the comments**: Every file has detailed explanations
-2. **Experiment**: Try changing values and see what happens
-3. **Break things**: Don't be afraid to break the app - you can always undo
-4. **Ask questions**: Use comments to understand, then ask if unclear
-5. **Build incrementally**: Start small, add features one at a time
-6. **Use Git**: Commit working code so you can always go back
+1. **Lee los comentarios**: Cada archivo tiene explicaciones detalladas
+2. **Experimenta**: Intenta cambiar valores y ve qué pasa
+3. **Rompe cosas**: No tengas miedo de romper la app - siempre puedes deshacer
+4. **Haz preguntas**: Usa los comentarios para entender, luego pregunta si no está claro
+5. **Construye incrementalmente**: Comienza pequeño, añade funciones una a la vez
+6. **Usa Git**: Haz commit del código que funciona para poder volver atrás
 
-## 📌 Next Steps
+## Próximos Pasos
 
-After getting the app running:
+Después de tener la app funcionando:
 
-1. **Explore the code**: Read through HomeScreen.tsx thoroughly
-2. **Make changes**: Try changing colors, text, or adding a new button
-3. **Create a component**: Make your first reusable component
-4. **Add navigation**: Learn to switch between multiple screens
-5. **Connect Supabase**: Add a real backend to your app
+1. **Explora el código**: Lee a fondo las pantallas principales
+2. **Haz cambios**: Intenta cambiar colores, texto o añadir un nuevo botón
+3. **Crea un componente**: Haz tu primer componente reutilizable
+4. **Personaliza tu perfil**: Añade géneros favoritos en el onboarding
+5. **Explora Firebase**: Aprende cómo se guardan los datos de usuario
 
-## 📄 License
+## Licencia
 
-This is a learning project - feel free to use, modify, and learn from it!
+Este es un proyecto de aprendizaje - siéntete libre de usarlo, modificarlo y aprender de él!
 
-## 🎉 You're Ready!
+## Estás Listo!
 
-Run `npm start`, press `i` for iOS or `a` for Android, and start your React Native journey!
+Ejecuta `npm start`, presiona `i` para iOS o `a` para Android, y comienza tu viaje en React Native!
 
-Remember: **Every expert was once a beginner.** Take your time, read the comments, experiment, and most importantly - have fun learning!
+Recuerda: **Todo experto fue una vez un principiante.** Tómate tu tiempo, lee los comentarios, experimenta, y lo más importante - diviértete aprendiendo!
 
 ---
 
-**Questions or stuck?** Check the code comments first - they're there to help you learn! 🚀
+**Preguntas o atascado?** Revisa primero los comentarios del código - están ahí para ayudarte a aprender!
