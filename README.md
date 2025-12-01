@@ -1,361 +1,260 @@
-# POCHOCLO - Proyecto de Aprendizaje React Native
+# POCHOCLO
 
-Bienvenido a POCHOCLO! Esta es una aplicación móvil de descubrimiento de películas y series enfocada en el aprendizaje, diseñada para enseñarte desarrollo en React Native desde cero.
+Una aplicación móvil de bienestar digital diseñada para ayudar a personas que luchan contra el abuso de redes sociales. POCHOCLO reemplaza el hábito negativo del "doomscrolling" con contenido educativo personalizado generado por inteligencia artificial.
 
-## Sobre la Aplicación
+## El Problema
 
-POCHOCLO es una app de entretenimiento que te ayuda a:
-- Descubrir películas y series populares
-- Obtener recomendaciones personalizadas basadas en tus gustos
-- Guardar tu contenido favorito en watchlists
-- Explorar por géneros, tendencias y más
+Millones de personas pasan horas haciendo scroll infinito en redes sociales sin obtener ningún valor real. Este "tiempo muerto" se convierte en un hábito difícil de romper que afecta la productividad, el bienestar mental y la calidad de vida.
 
-## Propósito del Proyecto
+## La Solución
 
-Este es un **proyecto educativo** construido para ayudarte a aprender:
-- **React Native**: Construir apps móviles usando React
-- **TypeScript**: Escribir código JavaScript con tipado seguro
-- **Expo**: Desarrollo simplificado de React Native
-- **Firebase**: Servicios de backend (base de datos, autenticación, almacenamiento)
-- **NativeWind**: Estilos con Tailwind CSS para React Native
+POCHOCLO transforma ese tiempo perdido en oportunidades de aprendizaje. En lugar de consumir contenido aleatorio y adictivo, los usuarios reciben artículos personalizados sobre temas que realmente les interesan, adaptados exactamente al tiempo que tienen disponible.
 
-Cada archivo en este proyecto contiene comentarios extensos explicando **por qué** y **cómo** funcionan las cosas, no solo qué hace el código.
+## Cómo Funciona
 
-## Qué Hace Este Proyecto Especial
+### 1. Onboarding Personalizado
 
-- **Enfoque en la Enseñanza**: El código está muy comentado con explicaciones educativas
-- **Aprendizaje Progresivo**: Comienza simple, añade complejidad mientras aprendes
-- **Patrones del Mundo Real**: Aprende las mejores prácticas de la industria desde el inicio
-- **Comentarios Completos**: Entiende el "por qué" detrás de cada decisión
+Cuando un usuario se registra, completa un breve proceso de configuración:
+
+- **Categorías de interés**: Selecciona los temas que le apasionan (tecnología, ciencia, negocios, salud, arte, historia, psicología, finanzas, idiomas, filosofía, medio ambiente, política, diseño, o categorías personalizadas)
+- **Tiempo disponible**: Indica cuántos minutos de "tiempo muerto" tiene al día (5, 10, 15, 30 minutos o un valor personalizado)
+
+### 2. Generación de Contenido con IA
+
+Desde la pantalla principal, el usuario presiona "Crear contenido" y el sistema:
+
+1. Envía las preferencias del usuario a un workflow de n8n
+2. n8n procesa la solicitud y llama a Claude (IA de Anthropic)
+3. Claude busca información actualizada en internet sobre las categorías del usuario
+4. Genera un artículo en formato limpio y fácil de leer
+5. El contenido aparece automáticamente en la app
+
+### 3. Sistema de Memoria Inteligente
+
+La aplicación **nunca muestra el mismo contenido dos veces**. Mantiene un historial de todos los artículos generados y lo envía con cada nueva solicitud para garantizar variedad constante.
+
+### 4. Alertas para Crear Hábitos
+
+Los usuarios pueden configurar recordatorios diarios a una hora específica. Estas notificaciones les recuerdan que es momento de aprender algo nuevo en lugar de abrir redes sociales.
+
+### 5. Guardar y Revisar
+
+Los artículos favoritos se pueden guardar para leer después. La sección "Guardados" permite acceder rápidamente al contenido que el usuario quiere conservar.
+
+## Funcionalidades
+
+| Funcionalidad | Descripción |
+|---------------|-------------|
+| **Autenticación** | Registro e inicio de sesión con email y contraseña |
+| **Onboarding** | Configuración inicial de categorías y tiempo disponible |
+| **Generación IA** | Contenido personalizado creado por Claude API |
+| **Anti-repetición** | Historial que garantiza contenido siempre nuevo |
+| **Alertas diarias** | Notificaciones locales para crear hábitos |
+| **Guardar artículos** | Bookmark de contenido favorito |
+| **Foto de perfil** | Selfie o imagen de galería |
+| **Artículos recientes** | Acceso rápido a los últimos 3 artículos leídos |
+| **Internacionalización** | Soporte para inglés y español |
 
 ## Stack Tecnológico
 
-| Tecnología | Propósito | Por Qué la Usamos |
-|------------|-----------|-------------------|
-| **React Native** | Framework móvil | Escribe una vez, ejecuta en iOS y Android |
-| **TypeScript** | Lenguaje | Detecta errores temprano con tipado seguro |
-| **Expo** | Plataforma de desarrollo | Configuración simplificada, excelentes herramientas |
-| **Firebase** | Servicio de backend | Base de datos, auth, almacenamiento sin manejar servidores |
-| **NativeWind** | Estilos | Tailwind CSS para React Native |
+### Frontend
+- **React Native** - Framework para desarrollo móvil multiplataforma
+- **Expo** - Herramientas y servicios para React Native
+- **TypeScript** - JavaScript con tipado estático
+- **NativeWind** - Tailwind CSS para React Native
+- **Redux Toolkit** - Gestión de estado global
+
+### Backend
+- **Firebase Authentication** - Autenticación de usuarios
+- **Cloud Firestore** - Base de datos NoSQL en tiempo real
+- **Firebase Storage** - Almacenamiento de imágenes (avatares)
+- **n8n** - Automatización de workflows
+- **Claude API** - Generación de contenido con IA
+
+### Servicios Adicionales
+- **Expo Notifications** - Notificaciones locales programadas
+- **Expo Image Picker** - Captura de fotos (cámara/galería)
 
 ## Estructura del Proyecto
 
 ```
 POCHOCLO/
-├── app/                    # Pantallas de la app (Expo Router)
-│   ├── (tabs)/            # Navegación por pestañas
-│   │   ├── index.tsx      # Pantalla de inicio (Home)
-│   │   ├── discover.tsx   # Descubrir contenido
-│   │   ├── watchlist.tsx  # Lista de seguimiento
-│   │   └── profile.tsx    # Perfil del usuario
-│   ├── (auth)/            # Pantallas de autenticación
-│   │   ├── login.tsx      # Inicio de sesión
-│   │   └── register.tsx   # Registro
-│   └── (onboarding)/      # Flujo de onboarding
+├── app/                          # Pantallas (Expo Router)
+│   ├── (auth)/                   # Flujo de autenticación
+│   │   ├── welcome.tsx           # Pantalla de bienvenida
+│   │   ├── sign-in.tsx           # Inicio de sesión
+│   │   ├── sign-up.tsx           # Registro
+│   │   └── onboarding/           # Configuración inicial
+│   │       ├── category-selection.tsx
+│   │       └── time-selection.tsx
+│   └── (app)/                    # App principal (autenticado)
+│       ├── home.tsx              # Pantalla principal
+│       ├── saved.tsx             # Artículos guardados
+│       └── profile.tsx           # Perfil y configuración
 │
-├── components/            # Componentes reutilizables
-│   ├── ui/               # Componentes de UI base
-│   └── ...               # Componentes específicos
+├── components/                   # Componentes reutilizables
+│   └── ui/                       # Sistema de diseño
 │
-├── services/             # Lógica de negocio y APIs
-│   ├── firebase.ts       # Configuración de Firebase
-│   ├── tmdb.ts          # API de películas (TMDB)
-│   └── content.ts       # Servicio de contenido
+├── services/                     # Lógica de negocio
+│   ├── firebase.ts               # Configuración Firebase
+│   ├── n8n.ts                    # Integración con n8n
+│   ├── savedContent.ts           # Gestión de guardados
+│   ├── contentHistory.ts         # Historial anti-repetición
+│   └── notifications.ts          # Alertas locales
 │
-├── hooks/                # Hooks personalizados de React
-├── contexts/             # Contextos de React (estado global)
-├── types/                # Definiciones de tipos TypeScript
-└── constants/            # Constantes y configuración
+├── store/                        # Redux state management
+│   └── slices/
+│       ├── authSlice.ts
+│       ├── contentSlice.ts
+│       └── userPreferencesSlice.ts
+│
+├── hooks/                        # Hooks personalizados
+├── contexts/                     # Contextos de React
+├── types/                        # Definiciones TypeScript
+└── constants/                    # Constantes y configuración
 ```
 
-## Sistema de Diseño
-
-**IMPORTANTE**: Toda la UI sigue el sistema de diseño definido en `UI_RULES.md`.
-
-### Referencia Rápida
-
-**Colores**
-- Fondo: `bg-background` (#FAFAF9 - blanco cálido)
-- Primario: `bg-primary` / `text-primary` (#6B8E7B - verde salvia suave)
-- Texto: `text-foreground` (#1C1917 - gris oscuro)
-- Atenuado: `text-muted-foreground` (#78716C)
-
-**Principios Fundamentales**
-- MINIMAL: Sin elementos innecesarios, abraza el espacio en blanco
-- LIGERO: Solo tema claro, fondos blancos cálidos
-- SUAVE: Colores atenuados, sin tonos vibrantes
-- MODERNO: Esquinas redondeadas (12px), tipografía limpia
-
-**Siempre Usa Componentes de UI**
-```tsx
-import { Button, Input, Text, Card } from "@/components/ui";
-
-// NO usar primitivos de React Native directamente para elementos estilizados
-```
-
-## Comenzando
+## Instalación
 
 ### Prerrequisitos
 
-Antes de comenzar, asegúrate de tener:
+- Node.js v18 o superior
+- npm o yarn
+- Expo CLI (`npm install -g expo-cli`)
+- Emulador iOS (Xcode) o Android (Android Studio)
 
-1. **Node.js** (v18 o más reciente)
-   - Descargar: https://nodejs.org/
-   - Verificar versión: `node --version`
+### Pasos
 
-2. **npm** (viene con Node.js)
-   - Verificar versión: `npm --version`
-
-3. **Git** (para control de versiones)
-   - Descargar: https://git-scm.com/
-   - Verificar versión: `git --version`
-
-4. **Emulador Móvil** (elige uno o ambos):
-   - **Simulador iOS**: Solo macOS, requiere Xcode
-   - **Android Studio**: Windows, macOS o Linux
-
-### Pasos de Instalación
-
-1. **Clona o navega a este proyecto**
-   ```bash
-   cd POCHOCLO
-   ```
-
-2. **Instala las dependencias**
-   ```bash
-   npm install
-   ```
-   Esto descarga todos los paquetes necesarios (React Native, Expo, Firebase, etc.)
-
-3. **Configura las variables de entorno**
-   ```bash
-   cp .env.example .env
-   ```
-   Luego edita `.env` con tus credenciales de Firebase y TMDB
-
-4. **Inicia el servidor de desarrollo**
-   ```bash
-   npm start
-   ```
-   Esto lanza Expo DevTools en tu navegador
-
-## Ejecutando en Emuladores
-
-### Opción 1: Simulador iOS (solo macOS)
-
-1. **Instala Xcode** desde la Mac App Store
-2. **Abre Xcode** al menos una vez para completar la configuración
-3. **Ejecuta la app**:
-   - Inicia el servidor: `npm start`
-   - Presiona `i` en la terminal
-
-### Opción 2: Emulador Android
-
-1. **Instala Android Studio**
-   - Descargar: https://developer.android.com/studio
-
-2. **Configura un Android Virtual Device (AVD)**:
-   - Abre Android Studio
-   - Ve a Tools → Device Manager
-   - Haz clic en "Create Device"
-   - Elige un dispositivo (Pixel 5 recomendado)
-   - Descarga una imagen del sistema (API 33+ recomendado)
-
-3. **Ejecuta la app**:
-   - Inicia el servidor: `npm start`
-   - Presiona `a` en la terminal
-
-### Opción 3: Dispositivo Físico
-
-1. **Instala la app Expo Go** en tu teléfono:
-   - iOS: https://apps.apple.com/app/expo-go/id982107779
-   - Android: https://play.google.com/store/apps/details?id=host.exp.exponent
-
-2. **Conéctate a la misma WiFi** que tu computadora
-
-3. **Escanea el código QR** mostrado en la terminal o navegador
-
-## Configuración de Firebase
-
-### 1. Crea una Cuenta de Firebase
-
-1. Ve a https://console.firebase.google.com
-2. Regístrate (nivel gratuito disponible)
-3. Crea un nuevo proyecto
-
-### 2. Obtén tus Credenciales
-
-1. En el dashboard de tu proyecto Firebase
-2. Ve a Configuración del proyecto
-3. Añade una app (Web, iOS o Android)
-4. Copia los valores de configuración
-
-### 3. Configura tu App
-
-Añade tus credenciales a `.env`:
-```env
-EXPO_PUBLIC_FIREBASE_API_KEY=tu-api-key
-EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=tu-proyecto.firebaseapp.com
-EXPO_PUBLIC_FIREBASE_PROJECT_ID=tu-proyecto
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=tu-proyecto.appspot.com
-EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=tu-sender-id
-EXPO_PUBLIC_FIREBASE_APP_ID=tu-app-id
+1. Clonar el repositorio
+```bash
+git clone https://github.com/fedeostan/pochoclo.git
+cd pochoclo
 ```
 
-## Configuración de TMDB (API de Películas)
+2. Instalar dependencias
+```bash
+npm install
+```
 
-1. Crea una cuenta en https://www.themoviedb.org/
-2. Ve a Configuración → API
-3. Solicita una API key
-4. Añade a `.env`:
+3. Configurar variables de entorno
+```bash
+cp .env.example .env
+```
+
+Editar `.env` con las credenciales:
 ```env
-EXPO_PUBLIC_TMDB_API_KEY=tu-tmdb-api-key
+# Firebase
+EXPO_PUBLIC_FIREBASE_API_KEY=
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+EXPO_PUBLIC_FIREBASE_APP_ID=
+
+# n8n
+EXPO_PUBLIC_N8N_WEBHOOK_URL=
+```
+
+4. Iniciar el servidor de desarrollo
+```bash
+npm start
+```
+
+5. Ejecutar en emulador
+- Presionar `i` para iOS
+- Presionar `a` para Android
+
+## Configuración de Servicios Externos
+
+### Firebase
+
+1. Crear proyecto en [Firebase Console](https://console.firebase.google.com)
+2. Habilitar Authentication con Email/Password
+3. Crear base de datos Firestore
+4. Configurar Storage para imágenes
+5. Copiar credenciales al archivo `.env`
+
+### n8n + Claude
+
+1. Configurar instancia de n8n (self-hosted o cloud)
+2. Crear workflow con webhook trigger
+3. Integrar Claude API para generación de contenido
+4. Configurar escritura a Firestore
+5. Copiar URL del webhook al archivo `.env`
+
+## Arquitectura de Generación de Contenido
+
+```
+┌──────────────┐     POST      ┌──────────────┐
+│   App        │ ──────────────► │   n8n        │
+│   (Redux)    │   webhook     │   Workflow   │
+└──────────────┘               └──────┬───────┘
+       │                              │
+       │                              ▼
+       │                       ┌──────────────┐
+       │                       │   Claude     │
+       │                       │   API        │
+       │                       └──────┬───────┘
+       │                              │
+       │                              ▼
+       │                       ┌──────────────┐
+       │  Real-time listener   │   Firestore  │
+       │◄──────────────────────┤   Database   │
+       │                       └──────────────┘
+       ▼
+┌──────────────┐
+│   UI Update  │
+│   (Content)  │
+└──────────────┘
+```
+
+## Modelo de Datos (Firestore)
+
+```
+users/{userId}/
+├── preferences           # Configuración del usuario
+│   ├── categories[]
+│   ├── dailyLearningMinutes
+│   ├── notifications { enabled, time }
+│   └── onboardingCompleted
+│
+├── generatedContent/     # Contenido generado por IA
+│   └── {requestId}
+│       ├── status
+│       ├── content { title, summary, body, sources }
+│       └── generatedAt
+│
+├── contentHistory/       # Historial anti-repetición
+│   └── {historyId}
+│       ├── topicSummary
+│       ├── category
+│       └── generatedAt
+│
+├── savedContent/         # Artículos guardados
+│   └── {requestId}
+│       ├── content
+│       └── savedAt
+│
+└── recentArticles/       # Últimos 3 leídos
+    └── {docId}
+        ├── contentBody
+        └── readAt
 ```
 
 ## Comandos Disponibles
 
 | Comando | Descripción |
 |---------|-------------|
-| `npm start` | Inicia el servidor de desarrollo de Expo |
+| `npm start` | Inicia el servidor de desarrollo |
 | `npm run android` | Ejecuta en emulador Android |
-| `npm run ios` | Ejecuta en simulador iOS (solo macOS) |
-| `npm run web` | Ejecuta en navegador web (experimental) |
-| `npm test` | Ejecuta tests |
-
-## Ruta de Aprendizaje
-
-### Nivel 1: Comenzando
-- Configura el entorno de desarrollo
-- Ejecuta la app en un emulador
-- Entiende la estructura del proyecto
-
-### Nivel 2: Fundamentos de React Native
-- Entiende componentes y JSX
-- Aprende sobre estado con useState
-- Estiliza componentes con NativeWind
-- Maneja entrada de usuario y eventos
-
-### Nivel 3: Integración con TypeScript
-- Aprende los básicos de TypeScript
-- Entiende las anotaciones de tipos
-- Usa interfaces y tipos
-- Detecta errores en tiempo de compilación
-
-### Nivel 4: Navegación
-- Usa Expo Router
-- Crea múltiples pantallas
-- Navega entre pantallas
-- Pasa datos entre pantallas
-
-### Nivel 5: Integración con Firebase
-- Conéctate a Firebase
-- Realiza operaciones CRUD con Firestore
-- Añade autenticación de usuarios
-- Maneja almacenamiento de archivos
-
-### Nivel 6: Temas Avanzados
-- Gestión de estado (Context API)
-- Hooks personalizados
-- Optimización de rendimiento
-- Publicación en tiendas de apps
-
-## Guía de Exploración del Código
-
-Empieza leyendo estos archivos en orden:
-
-1. **app/(tabs)/index.tsx** - Pantalla de inicio, componentes básicos
-2. **services/firebase.ts** - Configuración del backend
-3. **components/ui/** - Sistema de componentes reutilizables
-4. **hooks/** - Hooks personalizados para lógica compartida
-5. **CLAUDE.md** - Filosofía de enseñanza y estándares de código
-
-## Conceptos Clave a Entender
-
-### Componentes
-Los componentes son los bloques de construcción de las apps React Native. Piensa en ellos como piezas reutilizables de UI.
-
-### Estado (State)
-El estado son datos que pueden cambiar con el tiempo. Cuando el estado cambia, React re-renderiza el componente.
-
-### Props
-Las props (propiedades) son cómo los componentes padre pasan datos a los componentes hijo.
-
-### JSX
-JSX es sintaxis que parece HTML pero en realidad es JavaScript. Describe cómo debería verse la UI.
-
-### Tipos de TypeScript
-Los tipos ayudan a detectar errores antes de ejecutar el código. Documentan qué tipo de datos se esperan.
-
-## Solución de Problemas
-
-### "Metro bundler no puede conectarse"
-- Asegúrate de estar en la misma red WiFi
-- Intenta reiniciar con: `npm start -- --reset-cache`
-
-### "Unable to resolve module"
-- Limpia caché y reinstala:
-  ```bash
-  rm -rf node_modules
-  npm install
-  npm start -- --reset-cache
-  ```
-
-### "Xcode not found"
-- Instala Xcode desde la Mac App Store
-- Ejecuta: `sudo xcode-select --switch /Applications/Xcode.app`
-
-### Variables de entorno no funcionan
-- Deben empezar con `EXPO_PUBLIC_`
-- Reinicia el servidor de desarrollo después de cambiar .env
-- Limpia caché: `npm start -- --reset-cache`
-
-## Recursos de Aprendizaje
-
-### Documentación Oficial
-- **React Native**: https://reactnative.dev/
-- **Expo**: https://docs.expo.dev/
-- **TypeScript**: https://www.typescriptlang.org/docs/
-- **Firebase**: https://firebase.google.com/docs
-
-### Tutoriales Recomendados
-- Expo Getting Started: https://docs.expo.dev/get-started/introduction/
-- React Native Basics: https://reactnative.dev/docs/tutorial
-- TypeScript para Principiantes: https://www.typescriptlang.org/docs/handbook/typescript-from-scratch.html
-
-### Comunidad
-- React Native Discord: https://discord.gg/react-native-community
-- Expo Discord: https://discord.gg/expo
-- Stack Overflow: https://stackoverflow.com/questions/tagged/react-native
-
-## Cómo Aprender Efectivamente
-
-1. **Lee los comentarios**: Cada archivo tiene explicaciones detalladas
-2. **Experimenta**: Intenta cambiar valores y ve qué pasa
-3. **Rompe cosas**: No tengas miedo de romper la app - siempre puedes deshacer
-4. **Haz preguntas**: Usa los comentarios para entender, luego pregunta si no está claro
-5. **Construye incrementalmente**: Comienza pequeño, añade funciones una a la vez
-6. **Usa Git**: Haz commit del código que funciona para poder volver atrás
-
-## Próximos Pasos
-
-Después de tener la app funcionando:
-
-1. **Explora el código**: Lee a fondo las pantallas principales
-2. **Haz cambios**: Intenta cambiar colores, texto o añadir un nuevo botón
-3. **Crea un componente**: Haz tu primer componente reutilizable
-4. **Personaliza tu perfil**: Añade géneros favoritos en el onboarding
-5. **Explora Firebase**: Aprende cómo se guardan los datos de usuario
+| `npm run ios` | Ejecuta en simulador iOS |
+| `npm run build:android` | Genera build de Android |
+| `npm run build:ios` | Genera build de iOS |
 
 ## Licencia
 
-Este es un proyecto de aprendizaje - siéntete libre de usarlo, modificarlo y aprender de él!
-
-## Estás Listo!
-
-Ejecuta `npm start`, presiona `i` para iOS o `a` para Android, y comienza tu viaje en React Native!
-
-Recuerda: **Todo experto fue una vez un principiante.** Tómate tu tiempo, lee los comentarios, experimenta, y lo más importante - diviértete aprendiendo!
+Proyecto de aprendizaje - uso libre para fines educativos.
 
 ---
 
-**Preguntas o atascado?** Revisa primero los comentarios del código - están ahí para ayudarte a aprender!
+POCHOCLO: Transforma tu tiempo perdido en conocimiento.
