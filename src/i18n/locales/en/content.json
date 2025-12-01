@@ -1,0 +1,53 @@
+{
+  "card": {
+    "readFullArticle": "Read full article",
+    "save": "Save",
+    "saved": "Saved",
+    "remove": "Remove",
+    "done": "Done"
+  },
+  "fullView": {
+    "goBack": "Go back",
+    "saveForLater": "Save for later",
+    "removeFromSaved": "Remove from saved",
+    "sources": "Sources",
+    "finishedReading": "Finished reading?",
+    "savedMessage": "This article is saved and will stay in your library",
+    "doneMessage": "Mark as done to get new content next time",
+    "doneReading": "Done Reading",
+    "close": "Close",
+    "keepLearning": "Keep learning",
+    "done": "Done"
+  },
+  "loading": {
+    "title": "Creating your content...",
+    "steps": {
+      "analyzing": "Analyzing your interests",
+      "finding": "Finding relevant sources",
+      "generating": "Generating personalized content",
+      "polishing": "Polishing the article"
+    },
+    "tip": "This usually takes 10-30 seconds"
+  },
+  "saved": {
+    "title": "Saved",
+    "subtitle": "Your bookmarked articles will appear here",
+    "count": "{{count}} saved article",
+    "count_plural": "{{count}} saved articles",
+    "loading": "Loading saved articles...",
+    "empty": {
+      "title": "No Saved Articles",
+      "subtitle": "When you save an article from the Home screen, it will appear here for easy access later.",
+      "hint": "Tip: Tap the bookmark icon on any article to save it. Saved articles are stored permanently so you can read them anytime."
+    }
+  },
+  "sourcesList": {
+    "title": "Sources",
+    "poweredBy": "Content powered by AI"
+  },
+  "recent": {
+    "title": "Recent",
+    "emptyState": "Your recent articles will appear here",
+    "errorLoading": "Could not load recent articles"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "card": {
+    "readFullArticle": "Leer artículo completo",
+    "save": "Guardar",
+    "saved": "Guardado",
+    "remove": "Eliminar",
+    "done": "Listo"
+  },
+  "fullView": {
+    "goBack": "Volver",
+    "saveForLater": "Guardar para después",
+    "removeFromSaved": "Eliminar de guardados",
+    "sources": "Fuentes",
+    "finishedReading": "¿Terminaste de leer?",
+    "savedMessage": "Este artículo está guardado y permanecerá en tu biblioteca",
+    "doneMessage": "Marca como listo para obtener nuevo contenido la próxima vez",
+    "doneReading": "Terminé de leer",
+    "close": "Cerrar",
+    "keepLearning": "Seguir aprendiendo",
+    "done": "Listo"
+  },
+  "loading": {
+    "title": "Creando tu contenido...",
+    "steps": {
+      "analyzing": "Analizando tus intereses",
+      "finding": "Buscando fuentes relevantes",
+      "generating": "Generando contenido personalizado",
+      "polishing": "Puliendo el artículo"
+    },
+    "tip": "Esto generalmente toma 10-30 segundos"
+  },
+  "saved": {
+    "title": "Guardados",
+    "subtitle": "Tus artículos marcados aparecerán aquí",
+    "count": "{{count}} artículo guardado",
+    "count_plural": "{{count}} artículos guardados",
+    "loading": "Cargando artículos guardados...",
+    "empty": {
+      "title": "Sin artículos guardados",
+      "subtitle": "Cuando guardes un artículo desde la pantalla principal, aparecerá aquí para fácil acceso.",
+      "hint": "Consejo: Toca el ícono de marcador en cualquier artículo para guardarlo. Los artículos guardados se almacenan permanentemente para que puedas leerlos cuando quieras."
+    }
+  },
+  "sourcesList": {
+    "title": "Fuentes",
+    "poweredBy": "Contenido impulsado por IA"
+  },
+  "recent": {
+    "title": "Recientes",
+    "emptyState": "Tus artículos recientes aparecerán aquí",
+    "errorLoading": "No se pudieron cargar los artículos recientes"
+  }
+}

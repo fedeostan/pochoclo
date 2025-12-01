@@ -36,19 +36,25 @@
  * user (or null), so we don't need a separate initialization step.
  */
 
-import { useEffect } from "react";
-import { View } from "react-native";
+import { useEffect, useState } from "react";
+import { View, ActivityIndicator } from "react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Provider } from "react-redux";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { store, useAppDispatch } from "../src/store";
-import { setAuthState } from "../src/store/slices/authSlice";
+import { setAuthState, loadCachedSession } from "../src/store/slices/authSlice";
 import {
   loadPreferences,
   clearPreferences,
+  fetchWeeklyStats,
 } from "../src/store/slices/userPreferencesSlice";
+
+// Import SQLite database initialization
+// This must be called BEFORE any SQLite operations
+import { initDatabase } from "../src/services/sqlite";
 
 /**
  * Global CSS Import
@@ -60,6 +66,10 @@ import {
  * Without this import, className props won't work!
  */
 import "../src/styles/global.css";
+
+// Import i18n configuration (must be imported before using useTranslation)
+// This initializes the translation system and detects device language
+import "../src/i18n";
 
 // Import Firebase auth instance and listener function
 // onAuthStateChanged: Listens for auth state changes (sign in, sign out, token refresh)
@@ -112,9 +122,75 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch();
 
   /**
+   * Track if SQLite database is initialized
+   *
+   * We need to initialize SQLite BEFORE setting up the Firebase auth listener.
+   * This ensures SQLite is ready when we try to load the cached session.
+   *
+   * WHY STATE FOR THIS?
+   * - useState triggers re-render when SQLite is ready
+   * - Without it, we might try to use SQLite before it's ready
+   * - This ensures proper initialization order
+   */
+  const [dbReady, setDbReady] = useState(false);
+
+  /**
+   * Initialize SQLite Database
+   *
+   * This effect runs FIRST (no dependencies) to set up the local database.
+   * SQLite initialization is very fast (<100ms typically), but we still
+   * await it to ensure the database is ready before any operations.
+   *
+   * ORDER OF OPERATIONS:
+   * 1. Initialize SQLite database (create tables if needed)
+   * 2. Load cached session from SQLite (instant, for UI display)
+   * 3. Set up Firebase Auth listener (verifies session with server)
+   *
+   * WHY THIS ORDER?
+   * - SQLite must be ready before we can read/write sessions
+   * - Cached session gives us instant UI while Firebase loads
+   * - Firebase Auth is the source of truth, but takes longer
+   */
+  useEffect(() => {
+    async function initializeDatabase() {
+      try {
+        /**
+         * Initialize SQLite Database
+         *
+         * This creates the database file and tables if they don't exist.
+         * It's idempotent - safe to call multiple times.
+         */
+        await initDatabase();
+        console.log('SQLite database initialized successfully');
+
+        /**
+         * Load Cached Session
+         *
+         * Try to load any cached session from SQLite.
+         * This provides instant user info while Firebase verifies.
+         *
+         * IMPORTANT: This doesn't authenticate - just loads cached data!
+         * Firebase Auth will confirm the session shortly after.
+         */
+        dispatch(loadCachedSession());
+
+        // Mark database as ready
+        setDbReady(true);
+      } catch (error) {
+        // SQLite errors shouldn't prevent app from working
+        // Log and continue - Firebase Auth will handle authentication
+        console.error('Failed to initialize SQLite:', error);
+        setDbReady(true); // Still mark ready so app can continue
+      }
+    }
+
+    initializeDatabase();
+  }, [dispatch]);
+
+  /**
    * Set Up Firebase Auth State Listener
    *
-   * useEffect runs after the component mounts.
+   * This effect runs AFTER SQLite is ready (depends on dbReady).
    * We set up a single listener that handles:
    * 1. Initial auth state check (user might already be logged in)
    * 2. Ongoing auth state changes (sign in, sign out, token refresh)
@@ -144,6 +220,8 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
    * This is graceful degradation - the app remains functional.
    */
   useEffect(() => {
+    // Wait for SQLite to be ready before setting up Firebase listener
+    if (!dbReady) return;
     /**
      * Subscribe to Auth State Changes
      *
@@ -209,9 +287,15 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
        * rather than letting them fail silently.
        */
       if (user) {
-        // User is authenticated - load their preferences
+        // User is authenticated - load their preferences and stats
         try {
+          // Load preferences first (critical for routing)
           await dispatch(loadPreferences(user.uid)).unwrap();
+
+          // Load weekly stats (for UI display - streak counter, saved count)
+          // IMPORTANT: We await this to ensure stats are loaded before HomeScreen renders
+          // Without await, the streak counter shows 0 briefly on app refresh
+          await dispatch(fetchWeeklyStats(user.uid));
         } catch (error) {
           // Log error but don't crash - graceful degradation
           // The error is already stored in Redux state by the rejected handler
@@ -223,7 +307,7 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
           );
         }
       } else {
-        // User signed out - clear preferences
+        // User signed out - clear preferences (including stats)
         dispatch(clearPreferences());
       }
     });
@@ -239,7 +323,7 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
     return () => {
       unsubscribe();
     };
-  }, [dispatch]); // dispatch is stable, but ESLint wants it listed
+  }, [dispatch, dbReady]); // dispatch is stable, dbReady triggers re-setup when DB is ready
 
   // Render children (the navigation stack)
   return <>{children}</>;
@@ -286,6 +370,30 @@ export default function RootLayout() {
      * NOTE: style={{ flex: 1 }} is essential to make it fill the entire screen.
      */
     <GestureHandlerRootView style={{ flex: 1 }}>
+      {/**
+       * BottomSheetModalProvider
+       *
+       * This provider is REQUIRED for @gorhom/bottom-sheet's modal functionality.
+       * It creates a "portal" that allows bottom sheets to render ABOVE all other
+       * UI elements, including navigation bars.
+       *
+       * WHY DO WE NEED THIS?
+       * - Regular BottomSheet renders within its parent's bounds
+       * - This means it appears BEHIND tab bars and other navigation
+       * - BottomSheetModal + Provider renders at the ROOT level
+       * - This ensures modals appear above everything else
+       *
+       * WHERE TO PLACE IT:
+       * - Must be inside GestureHandlerRootView (gestures need this context)
+       * - Should wrap everything that might use BottomSheetModal
+       * - We place it at the very top to cover the entire app
+       *
+       * COMPONENTS THAT USE THIS:
+       * - TimePicker (time selection for reminders)
+       * - ImagePickerSheet (profile photo selection)
+       * - Any future modal bottom sheets
+       */}
+      <BottomSheetModalProvider>
       {/**
        * SafeAreaProvider
        *
@@ -381,6 +489,7 @@ export default function RootLayout() {
         </AppInitializer>
       </Provider>
       </SafeAreaProvider>
+      </BottomSheetModalProvider>
     </GestureHandlerRootView>
   );
 }

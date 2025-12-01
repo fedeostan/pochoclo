@@ -32,6 +32,7 @@
 
 import React from 'react';
 import { View, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Bookmark, BookmarkCheck, Clock, Tag, ChevronRight, X } from 'lucide-react-native';
 import {
   Card,
@@ -53,6 +54,11 @@ import { colors } from '@/theme';
  * @property onDismiss - Callback when dismiss button is pressed
  * @property isSaved - Whether the content is already saved/bookmarked
  * @property className - Additional styling classes
+ * @property context - Where the card is displayed ('home' or 'saved')
+ *
+ * CONTEXT BEHAVIOR:
+ * - 'home' (default): Save button saves article, Done dismisses
+ * - 'saved': Save button UNSAVES (removes), Done also removes
  */
 interface ContentCardProps {
   content: GeneratedContent;
@@ -61,6 +67,7 @@ interface ContentCardProps {
   onDismiss?: () => void;
   isSaved?: boolean;
   className?: string;
+  context?: 'home' | 'saved';
 }
 
 /**
@@ -75,7 +82,14 @@ export function ContentCard({
   onDismiss,
   isSaved = false,
   className,
+  context = 'home',
 }: ContentCardProps) {
+  /**
+   * Translation hooks for i18n support
+   */
+  const { t } = useTranslation('content');
+  const { t: tCommon } = useTranslation('common');
+
   // Guard: Don't render if no content body
   if (!content.content) {
     return null;
@@ -84,11 +98,25 @@ export function ContentCard({
   const { title, summary, category, readingTimeMinutes } = content.content;
 
   return (
-    <Card className={className}>
+    /**
+     * Card with minimum height for better visual presence
+     *
+     * WHY min-h-[320px]?
+     * The card should command attention on the home screen. A taller card:
+     * - Creates visual hierarchy (this is the main content!)
+     * - Feels more "worth reading" (substantial, not a notification)
+     * - Uses screen real estate better (fills "dead space")
+     *
+     * We use minHeight instead of percentage because:
+     * - Percentage heights in React Native depend on parent constraints
+     * - Fixed minHeight is predictable and consistent
+     * - Content can still grow beyond 320px if needed
+     */
+    <Card className={`min-h-[320px] ${className || ''}`}>
       {/* Main pressable area - opens full view */}
       <Pressable
         onPress={onPress}
-        className="active:opacity-90"
+        className="active:opacity-90 flex-1"
         accessibilityLabel={`Read article: ${title}`}
         accessibilityRole="button"
       >
@@ -108,13 +136,21 @@ export function ContentCard({
             <View className="flex-row items-center gap-1">
               <Clock size={14} color={colors.textSecondary} />
               <Text variant="small" className="text-muted-foreground">
-                {readingTimeMinutes} min read
+                {tCommon('time.minRead', { count: readingTimeMinutes })}
               </Text>
             </View>
           </View>
 
-          {/* Title */}
-          <Text variant="h3" className="leading-tight">
+          {/* Title - Large and commanding (h2 instead of h3)
+           *
+           * WHY h2?
+           * The title is the most important element on the card.
+           * A larger title:
+           * - Draws the eye immediately
+           * - Creates clear visual hierarchy
+           * - Makes content feel more substantial/important
+           */}
+          <Text variant="h2" className="leading-tight">
             {title}
           </Text>
         </CardHeader>
@@ -129,7 +165,7 @@ export function ContentCard({
           {/* "Read more" indicator */}
           <View className="flex-row items-center mt-4">
             <Text variant="small" className="text-primary font-medium">
-              Read full article
+              {t('card.readFullArticle')}
             </Text>
             <ChevronRight size={16} color={colors.primary} />
           </View>
@@ -138,42 +174,74 @@ export function ContentCard({
 
       {/* Action buttons footer */}
       <CardFooter className="justify-between border-t border-border/50 mt-2">
-        {/* Save/Bookmark button */}
+        {/*
+         * Save/Bookmark Button
+         *
+         * CONTEXT BEHAVIOR:
+         * - In 'home': Shows "Save" or "Saved" based on isSaved state
+         * - In 'saved': Shows "Remove" to unsave the article
+         */}
         <Pressable
           onPress={onSave}
           className="flex-row items-center gap-2 py-2 px-3 rounded-lg active:bg-primary/10"
-          accessibilityLabel={isSaved ? 'Remove from saved' : 'Save for later'}
+          accessibilityLabel={
+            context === 'saved'
+              ? 'Remove from saved'
+              : isSaved
+                ? 'Remove from saved'
+                : 'Save for later'
+          }
           accessibilityRole="button"
         >
-          {isSaved ? (
+          {context === 'saved' ? (
+            // In Saved context: Show "Remove" option
             <>
               <BookmarkCheck size={20} color={colors.primary} />
               <Text variant="small" className="text-primary font-medium">
-                Saved
+                {t('card.remove')}
+              </Text>
+            </>
+          ) : isSaved ? (
+            // In Home context, already saved
+            <>
+              <BookmarkCheck size={20} color={colors.primary} />
+              <Text variant="small" className="text-primary font-medium">
+                {t('card.saved')}
               </Text>
             </>
           ) : (
+            // In Home context, not yet saved
             <>
               <Bookmark size={20} color={colors.textSecondary} />
               <Text variant="small" className="text-muted-foreground">
-                Save
+                {t('card.save')}
               </Text>
             </>
           )}
         </Pressable>
 
-        {/* Dismiss button */}
-        <Pressable
-          onPress={onDismiss}
-          className="flex-row items-center gap-2 py-2 px-3 rounded-lg active:bg-muted/20"
-          accessibilityLabel="Mark as read and dismiss"
-          accessibilityRole="button"
-        >
-          <X size={20} color={colors.textSecondary} />
-          <Text variant="small" className="text-muted-foreground">
-            Done
-          </Text>
-        </Pressable>
+        {/*
+         * Done/Dismiss Button
+         *
+         * CONTEXT BEHAVIOR:
+         * - In 'home': "Done" dismisses the article (and deletes if not saved)
+         * - In 'saved': "Remove" unsaves the article (same as save button)
+         *
+         * NOTE: In 'saved' context, we hide this button since "Remove" already exists
+         */}
+        {context === 'home' && (
+          <Pressable
+            onPress={onDismiss}
+            className="flex-row items-center gap-2 py-2 px-3 rounded-lg active:bg-muted/20"
+            accessibilityLabel="Mark as read and dismiss"
+            accessibilityRole="button"
+          >
+            <X size={20} color={colors.textSecondary} />
+            <Text variant="small" className="text-muted-foreground">
+              {t('card.done')}
+            </Text>
+          </Pressable>
+        )}
       </CardFooter>
     </Card>
   );
@@ -223,6 +291,21 @@ export function ContentCard({
  *    - gap-2: 8px
  *    - mb-3: 12px margin bottom
  *    - mt-4: 16px margin top
+ *
+ * 8. CONTEXT PROP PATTERN
+ *    The context prop allows the same component to behave differently
+ *    based on where it's used:
+ *    - 'home': Normal save/dismiss behavior
+ *    - 'saved': "Remove" button to unsave, no separate Done button
+ *
+ *    This is a common pattern called "contextual behavior" - the component
+ *    adapts its UI and behavior based on the context in which it's rendered.
+ *    Alternative approaches:
+ *    - Create separate components (SavedContentCard, HomeContentCard)
+ *    - Use render props to customize the footer
+ *
+ *    We chose the context prop for simplicity - most of the component
+ *    is identical, only the footer buttons differ.
  */
 
 export default ContentCard;

@@ -41,6 +41,10 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 // signOut: Logs out the current user
 // sendPasswordResetEmail: Sends password reset email
 // updateProfile: Updates user's displayName and photoURL
+// EmailAuthProvider: Used to create credentials for reauthentication
+// reauthenticateWithCredential: Verifies user identity before sensitive operations
+// updatePassword: Changes the user's password
+// verifyBeforeUpdateEmail: Changes email with verification (more secure)
 import {
   User,
   signInWithEmailAndPassword,
@@ -48,6 +52,10 @@ import {
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
   updateProfile,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+  verifyBeforeUpdateEmail,
 } from 'firebase/auth';
 
 // Import our configured Firebase auth instance
@@ -57,6 +65,16 @@ import { auth } from '../../config/firebase';
 // These handle the actual file upload/delete and database updates
 import { uploadProfileImage, deleteProfileImage, getStorageErrorMessage } from '../../services/storage';
 import { updateUserProfileImage as updateFirestoreProfileImage } from '../../services/firestore';
+
+// Import SQLite services for local session persistence
+// SQLite provides offline-capable local storage for user session data
+// This enables faster app startup and offline access to cached user info
+import {
+  saveSession as saveSQLiteSession,
+  getSession as getSQLiteSession,
+  deleteSession as deleteSQLiteSession,
+  updateSession as updateSQLiteSession,
+} from '../../services/sqlite';
 
 /**
  * =============================================================================
@@ -86,7 +104,7 @@ import { updateUserProfileImage as updateFirestoreProfileImage } from '../../ser
  *
  * WHAT WE DON'T STORE:
  * - Methods like getIdToken() - call them directly on auth.currentUser
- * - metadata - can be accessed via auth.currentUser if needed
+ * - Full metadata - we only store creationTime for "Member since"
  * - providerData - for OAuth providers, access via auth.currentUser
  */
 export interface SerializableUser {
@@ -95,6 +113,8 @@ export interface SerializableUser {
   displayName: string | null;
   photoURL: string | null;
   emailVerified: boolean;
+  /** Account creation timestamp from Firebase metadata */
+  createdAt: string | null;
 }
 
 /**
@@ -116,6 +136,8 @@ function serializeUser(user: User): SerializableUser {
     displayName: user.displayName,
     photoURL: user.photoURL,
     emailVerified: user.emailVerified,
+    // Firebase metadata.creationTime is an ISO string like "2024-01-15T10:30:00Z"
+    createdAt: user.metadata.creationTime || null,
   };
 }
 
@@ -312,10 +334,15 @@ function getFirebaseErrorMessage(errorCode: string): string {
     'auth/weak-password': 'Password is too weak. Use at least 6 characters.',
     'auth/operation-not-allowed': 'Email/password sign up is not enabled.',
 
+    // Account Management errors (Phase 3)
+    // These errors occur when changing email or password
+    'auth/requires-recent-login': 'This operation requires recent authentication. Please sign out and sign in again.',
+    'auth/invalid-credential': 'Invalid credentials. Please check your password and try again.',
+    'auth/user-mismatch': 'The credentials do not match the current user.',
+
     // General errors
     'auth/network-request-failed': 'Network error. Please check your connection.',
     'auth/internal-error': 'An internal error occurred. Please try again.',
-    'auth/invalid-credential': 'Invalid credentials. Please try again.',
   };
 
   return errorMessages[errorCode] || 'An unexpected error occurred. Please try again.';
@@ -339,6 +366,73 @@ function getFirebaseErrorMessage(errorCode: string): string {
  * in _layout.tsx. The listener automatically fires with the current user
  * (or null) when subscribed, handling initialization for us.
  */
+
+/**
+ * =============================================================================
+ * SQLITE SESSION CACHE THUNK
+ * =============================================================================
+ *
+ * This thunk loads cached session data from SQLite.
+ * It's used for faster app startup - we can show cached user info
+ * while Firebase Auth verifies the session in the background.
+ *
+ * WHEN TO USE:
+ * Call this during app initialization, BEFORE Firebase Auth initializes.
+ * This lets us show the user's name/avatar immediately instead of a loading screen.
+ *
+ * FLOW:
+ * 1. App starts → Load cached session from SQLite (instant)
+ * 2. Show cached user info in UI
+ * 3. Firebase Auth initializes (may take 1-2 seconds)
+ * 4. onAuthStateChanged fires with real user or null
+ * 5. If real user differs from cache, Redux state updates
+ * 6. If null (logged out), clear the stale cache
+ */
+export const loadCachedSession = createAsyncThunk(
+  'auth/loadCachedSession',
+  async (_, { rejectWithValue }) => {
+    try {
+      /**
+       * Get cached session from SQLite
+       *
+       * This is a local database read - very fast (< 10ms typically).
+       * Returns null if no cached session exists.
+       */
+      const cachedSession = await getSQLiteSession();
+
+      if (!cachedSession) {
+        // No cached session - user needs to log in
+        return { cachedUser: null };
+      }
+
+      /**
+       * Convert SQLite session to SerializableUser format
+       *
+       * SQLite stores a subset of user data. We transform it to match
+       * the shape Redux expects (SerializableUser).
+       *
+       * NOTE: This is CACHED data - it may be stale!
+       * Firebase Auth will verify and update if needed.
+       */
+      const cachedUser: SerializableUser = {
+        uid: cachedSession.userId,
+        email: cachedSession.email,
+        displayName: cachedSession.displayName,
+        photoURL: cachedSession.photoURL,
+        emailVerified: true, // Assume verified for cached users
+        createdAt: null, // We don't cache this
+      };
+
+      console.log('Loaded cached session from SQLite for user:', cachedUser.uid);
+      return { cachedUser };
+
+    } catch (error) {
+      // SQLite errors shouldn't prevent app from working
+      console.warn('Failed to load cached session:', error);
+      return rejectWithValue('Failed to load cached session');
+    }
+  }
+);
 
 /**
  * Sign In Credentials Type
@@ -392,6 +486,42 @@ export const signIn = createAsyncThunk(
        * (configured in firebase.ts with getReactNativePersistence).
        */
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+
+      /**
+       * Save session to SQLite for local persistence
+       *
+       * WHY SAVE TO SQLITE?
+       * 1. Faster app startup - cached session data loads instantly
+       * 2. Offline support - user info available without network
+       * 3. Reduced Firebase calls - don't need to fetch user data every time
+       *
+       * WHAT WE STORE:
+       * - userId: Firebase UID for identification
+       * - email: For display and login hints
+       * - displayName: For greeting the user
+       * - photoURL: For showing the avatar
+       * - lastLogin: Track when user last logged in
+       * - createdAt: Track when this cache entry was created
+       *
+       * SYNC STRATEGY:
+       * SQLite is the CACHE, Firebase Auth is the SOURCE OF TRUTH.
+       * We update SQLite on login, and Firebase verifies in the background.
+       */
+      const firebaseUser = userCredential.user;
+      try {
+        await saveSQLiteSession({
+          userId: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          photoURL: firebaseUser.photoURL,
+          lastLogin: Date.now(),
+          createdAt: Date.now(),
+        });
+        console.log('Session saved to SQLite after sign in');
+      } catch (sqliteError) {
+        // Don't fail the login if SQLite fails - it's just a cache
+        console.warn('Failed to save session to SQLite:', sqliteError);
+      }
 
       /**
        * Return the SERIALIZED user object
@@ -493,6 +623,28 @@ export const signUp = createAsyncThunk(
       }
 
       /**
+       * Save session to SQLite after signup
+       *
+       * New users get their session cached immediately.
+       * This is identical to the signIn flow - we cache the user data
+       * for faster access and offline support.
+       */
+      try {
+        await saveSQLiteSession({
+          userId: user.uid,
+          email: user.email,
+          displayName: user.displayName, // Will include displayName if set above
+          photoURL: user.photoURL,
+          lastLogin: Date.now(),
+          createdAt: Date.now(),
+        });
+        console.log('Session saved to SQLite after sign up');
+      } catch (sqliteError) {
+        // Don't fail signup if SQLite fails - it's just a cache
+        console.warn('Failed to save session to SQLite:', sqliteError);
+      }
+
+      /**
        * Return the SERIALIZED user object
        *
        * After updateProfile, the user object has the updated displayName.
@@ -532,6 +684,30 @@ export const signOut = createAsyncThunk(
   'auth/signOut',
   async (_, { rejectWithValue }) => {
     try {
+      /**
+       * Clear SQLite session BEFORE Firebase sign out
+       *
+       * SECURITY: When a user logs out, we MUST clear their local data.
+       * This prevents the next user of the device from seeing the
+       * previous user's cached information.
+       *
+       * ORDER OF OPERATIONS:
+       * 1. Clear SQLite (local data) - even if Firebase logout fails
+       * 2. Firebase signOut (cloud auth)
+       *
+       * We clear SQLite first because:
+       * - Even if Firebase fails, local data should be cleared
+       * - User's privacy is protected immediately
+       * - The next login will re-populate SQLite
+       */
+      try {
+        await deleteSQLiteSession();
+        console.log('SQLite session cleared on sign out');
+      } catch (sqliteError) {
+        // Log but don't fail - continue with Firebase signout
+        console.warn('Failed to clear SQLite session:', sqliteError);
+      }
+
       /**
        * firebaseSignOut
        *
@@ -599,6 +775,320 @@ export const resetPassword = createAsyncThunk(
       const errorMessage = firebaseError.code
         ? getFirebaseErrorMessage(firebaseError.code)
         : 'Failed to send reset email';
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
+ * =============================================================================
+ * ACCOUNT MANAGEMENT THUNKS (Phase 3)
+ * =============================================================================
+ *
+ * These thunks handle sensitive account operations:
+ * - Reauthentication (required before sensitive changes)
+ * - Password change
+ * - Email change
+ *
+ * WHY REAUTHENTICATION?
+ * Firebase requires recent authentication for sensitive operations because:
+ * 1. Security: Ensures the actual account owner is making changes
+ * 2. Session age: Long-running sessions could be compromised
+ * 3. Phishing protection: Prevents unauthorized changes from stolen sessions
+ *
+ * If a user has been signed in for a while and tries to change their password,
+ * Firebase may return 'auth/requires-recent-login'. In that case, we need to
+ * reauthenticate the user (verify their password) before proceeding.
+ *
+ * FLOW FOR SENSITIVE OPERATIONS:
+ * 1. User enters current password
+ * 2. We create an AuthCredential with EmailAuthProvider
+ * 3. We call reauthenticateWithCredential to verify identity
+ * 4. If successful, we proceed with the sensitive operation
+ * 5. If failed, we show an error (wrong password, etc.)
+ */
+
+/**
+ * Reauthenticate User Payload Type
+ *
+ * The current password is needed to verify the user's identity.
+ * This is required before changing password or email.
+ */
+interface ReauthenticatePayload {
+  currentPassword: string;
+}
+
+/**
+ * Reauthenticate User Thunk
+ *
+ * Verifies the user's identity by confirming their current password.
+ * This is required before sensitive operations like changing email or password.
+ *
+ * WHY THIS IS NECESSARY:
+ * Even if a user is already signed in, Firebase requires fresh authentication
+ * for sensitive operations. This protects against:
+ * - Stolen devices (attacker can't change password without knowing it)
+ * - Session hijacking (stolen cookies can't make critical changes)
+ * - Accidental changes (user must confirm they know the password)
+ *
+ * HOW IT WORKS:
+ * 1. We create an "AuthCredential" from the email and password
+ * 2. We call reauthenticateWithCredential with this credential
+ * 3. Firebase verifies the password against the stored hash
+ * 4. If correct, the user is considered "recently authenticated"
+ * 5. They can now perform sensitive operations
+ *
+ * @param payload - { currentPassword: string }
+ * @returns undefined on success
+ * @throws Error if password is incorrect or user is not signed in
+ */
+export const reauthenticateUser = createAsyncThunk(
+  'auth/reauthenticate',
+  async (payload: ReauthenticatePayload, { rejectWithValue }) => {
+    const { currentPassword } = payload;
+
+    try {
+      /**
+       * Get the current user from Firebase Auth
+       *
+       * auth.currentUser is the live Firebase User object.
+       * It's different from state.auth.user (serialized snapshot).
+       *
+       * We need the live object to:
+       * - Access the user's email
+       * - Call reauthenticateWithCredential
+       */
+      const currentUser = auth.currentUser;
+
+      if (!currentUser || !currentUser.email) {
+        return rejectWithValue('You must be signed in to perform this action.');
+      }
+
+      /**
+       * Create an AuthCredential
+       *
+       * EmailAuthProvider.credential() creates a credential object
+       * that represents the email/password combination.
+       *
+       * This credential is NOT verified yet - it's just a data structure
+       * that holds the email and password for verification.
+       *
+       * SECURITY NOTE:
+       * The password is NOT sent in plain text to Firebase.
+       * Firebase Auth uses secure hashing (like bcrypt) to verify passwords.
+       */
+      const credential = EmailAuthProvider.credential(
+        currentUser.email,
+        currentPassword
+      );
+
+      /**
+       * Reauthenticate the user
+       *
+       * This sends the credential to Firebase for verification.
+       * Firebase checks if the password matches the stored hash.
+       *
+       * ON SUCCESS:
+       * - Returns a UserCredential object
+       * - User is considered "recently authenticated"
+       * - Can now perform sensitive operations
+       *
+       * ON FAILURE:
+       * - Throws an error with code like 'auth/wrong-password'
+       * - User cannot perform sensitive operations
+       */
+      await reauthenticateWithCredential(currentUser, credential);
+
+      // Return undefined - the important part is that we didn't throw
+      return undefined;
+
+    } catch (error: unknown) {
+      const firebaseError = error as { code?: string; message?: string };
+      const errorMessage = firebaseError.code
+        ? getFirebaseErrorMessage(firebaseError.code)
+        : 'Failed to verify your password';
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
+ * Update Password Payload Type
+ *
+ * Contains the current password (for reauthentication) and the new password.
+ */
+interface UpdatePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}
+
+/**
+ * Update User Password Thunk
+ *
+ * Changes the user's password after verifying their identity.
+ *
+ * FLOW:
+ * 1. User enters current password and new password
+ * 2. We reauthenticate to verify identity
+ * 3. We update the password with the new value
+ * 4. User can now sign in with the new password
+ *
+ * SECURITY CONSIDERATIONS:
+ * - Current password required (prevents unauthorized changes)
+ * - New password must meet Firebase requirements (min 6 chars)
+ * - Firebase invalidates other sessions after password change
+ *
+ * WHAT HAPPENS TO OTHER DEVICES?
+ * When a password is changed, Firebase:
+ * - Keeps the current session active
+ * - May sign out other devices (depends on Firebase settings)
+ * - The user should be informed of this behavior
+ *
+ * @param payload - { currentPassword, newPassword }
+ * @returns undefined on success
+ */
+export const updateUserPassword = createAsyncThunk(
+  'auth/updatePassword',
+  async (payload: UpdatePasswordPayload, { rejectWithValue }) => {
+    const { currentPassword, newPassword } = payload;
+
+    try {
+      const currentUser = auth.currentUser;
+
+      if (!currentUser || !currentUser.email) {
+        return rejectWithValue('You must be signed in to change your password.');
+      }
+
+      /**
+       * Step 1: Reauthenticate the user
+       *
+       * Before changing the password, we must verify the user's identity.
+       * This is a security requirement from Firebase.
+       */
+      const credential = EmailAuthProvider.credential(
+        currentUser.email,
+        currentPassword
+      );
+
+      await reauthenticateWithCredential(currentUser, credential);
+
+      /**
+       * Step 2: Update the password
+       *
+       * updatePassword() changes the user's password to the new value.
+       *
+       * REQUIREMENTS:
+       * - User must be recently authenticated (we just did that)
+       * - New password must be at least 6 characters
+       *
+       * AFTER SUCCESS:
+       * - Old password no longer works
+       * - User can sign in with new password
+       * - Current session remains active
+       */
+      await updatePassword(currentUser, newPassword);
+
+      return undefined;
+
+    } catch (error: unknown) {
+      const firebaseError = error as { code?: string; message?: string };
+      const errorMessage = firebaseError.code
+        ? getFirebaseErrorMessage(firebaseError.code)
+        : 'Failed to update password';
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
+ * Update Email Payload Type
+ *
+ * Contains the current password (for reauthentication) and the new email.
+ */
+interface UpdateEmailPayload {
+  currentPassword: string;
+  newEmail: string;
+}
+
+/**
+ * Update User Email Thunk
+ *
+ * Changes the user's email address after verification.
+ *
+ * IMPORTANT: We use verifyBeforeUpdateEmail, NOT updateEmail!
+ *
+ * WHY verifyBeforeUpdateEmail?
+ * - More secure: The new email must be verified before the change takes effect
+ * - Prevents hijacking: Someone can't change your email to theirs without access
+ * - User experience: The current email continues to work until verification
+ *
+ * FLOW:
+ * 1. User enters current password and new email
+ * 2. We reauthenticate to verify identity
+ * 3. We call verifyBeforeUpdateEmail
+ * 4. Firebase sends a verification link to the NEW email
+ * 5. User clicks the link → Email is officially changed
+ * 6. User can now sign in with the new email
+ *
+ * WHAT THE USER NEEDS TO KNOW:
+ * - They'll receive an email at their NEW email address
+ * - They must click the verification link
+ * - Until they verify, their current email still works
+ * - After verification, the old email no longer works
+ *
+ * @param payload - { currentPassword, newEmail }
+ * @returns undefined on success (verification email sent)
+ */
+export const updateUserEmail = createAsyncThunk(
+  'auth/updateEmail',
+  async (payload: UpdateEmailPayload, { rejectWithValue }) => {
+    const { currentPassword, newEmail } = payload;
+
+    try {
+      const currentUser = auth.currentUser;
+
+      if (!currentUser || !currentUser.email) {
+        return rejectWithValue('You must be signed in to change your email.');
+      }
+
+      /**
+       * Step 1: Reauthenticate the user
+       *
+       * Email changes are sensitive operations that require recent auth.
+       */
+      const credential = EmailAuthProvider.credential(
+        currentUser.email,
+        currentPassword
+      );
+
+      await reauthenticateWithCredential(currentUser, credential);
+
+      /**
+       * Step 2: Send verification email to new address
+       *
+       * verifyBeforeUpdateEmail does several things:
+       * 1. Validates the new email format
+       * 2. Checks if the email is already in use
+       * 3. Sends a verification link to the new email
+       * 4. Waits for user to click the link before actually changing
+       *
+       * THE EMAIL IS NOT CHANGED YET!
+       * The user must click the verification link for the change to happen.
+       *
+       * WHAT IF USER DOESN'T VERIFY?
+       * - The current email continues to work
+       * - No change happens
+       * - The verification link expires (configurable in Firebase Console)
+       */
+      await verifyBeforeUpdateEmail(currentUser, newEmail);
+
+      return undefined;
+
+    } catch (error: unknown) {
+      const firebaseError = error as { code?: string; message?: string };
+      const errorMessage = firebaseError.code
+        ? getFirebaseErrorMessage(firebaseError.code)
+        : 'Failed to send verification email';
       return rejectWithValue(errorMessage);
     }
   }
@@ -744,7 +1234,25 @@ export const updateUserProfileImage = createAsyncThunk(
       await updateFirestoreProfileImage(user.uid, downloadURL);
 
       /**
-       * Step 5: Return the new photoURL
+       * Step 5: Update SQLite session cache
+       *
+       * Keep the local cache in sync with the new profile image.
+       * This ensures the cached session shows the correct avatar
+       * even when offline or on app restart.
+       */
+      try {
+        await updateSQLiteSession(user.uid, {
+          photoURL: downloadURL,
+          lastLogin: Date.now(),
+        });
+        console.log('SQLite session updated with new profile image');
+      } catch (sqliteError) {
+        // Don't fail the operation if SQLite fails
+        console.warn('Failed to update SQLite session:', sqliteError);
+      }
+
+      /**
+       * Step 6: Return the new photoURL
        *
        * The fulfilled reducer will use this to update state.auth.user.photoURL.
        * This ensures Redux state matches what we just saved.
@@ -834,7 +1342,24 @@ export const removeUserProfileImage = createAsyncThunk(
       await updateFirestoreProfileImage(user.uid, null);
 
       /**
-       * Step 5: Return success
+       * Step 5: Update SQLite session cache
+       *
+       * Clear the photoURL in the local cache as well.
+       * This ensures consistency across all storage layers.
+       */
+      try {
+        await updateSQLiteSession(user.uid, {
+          photoURL: null,
+          lastLogin: Date.now(),
+        });
+        console.log('SQLite session updated - profile image removed');
+      } catch (sqliteError) {
+        // Don't fail the operation if SQLite fails
+        console.warn('Failed to update SQLite session:', sqliteError);
+      }
+
+      /**
+       * Step 6: Return success
        *
        * The fulfilled reducer will set state.auth.user.photoURL = null.
        */
@@ -1097,6 +1622,142 @@ const authSlice = createSlice({
       })
 
       // =========================================================================
+      // REAUTHENTICATE USER (Phase 3)
+      // =========================================================================
+      /**
+       * Reauthenticate User Reducers
+       *
+       * These handle the reauthentication flow that's required before
+       * sensitive operations like changing password or email.
+       *
+       * NOTE: This thunk is primarily called internally by updateUserPassword
+       * and updateUserEmail, but it can also be used standalone if needed.
+       */
+      .addCase(reauthenticateUser.pending, (state) => {
+        /**
+         * Reauthentication Started
+         *
+         * Show loading state while verifying the password.
+         */
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(reauthenticateUser.fulfilled, (state) => {
+        /**
+         * Reauthentication Succeeded
+         *
+         * The user's identity has been verified.
+         * They can now perform sensitive operations.
+         *
+         * We don't change the user object - just clear loading.
+         */
+        state.loading = false;
+      })
+      .addCase(reauthenticateUser.rejected, (state, action) => {
+        /**
+         * Reauthentication Failed
+         *
+         * The password was incorrect or another error occurred.
+         * The user cannot perform sensitive operations.
+         */
+        state.loading = false;
+        state.error = (action.payload as string) ?? 'Failed to verify password';
+      })
+
+      // =========================================================================
+      // UPDATE USER PASSWORD (Phase 3)
+      // =========================================================================
+      /**
+       * Update User Password Reducers
+       *
+       * These handle the password change flow.
+       * The password is changed directly in Firebase Auth.
+       */
+      .addCase(updateUserPassword.pending, (state) => {
+        /**
+         * Password Update Started
+         *
+         * Show loading while we:
+         * 1. Reauthenticate the user
+         * 2. Update the password
+         */
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateUserPassword.fulfilled, (state) => {
+        /**
+         * Password Update Succeeded
+         *
+         * The password has been changed successfully.
+         * The user can now sign in with their new password.
+         *
+         * NOTE: We don't update any user data in state because
+         * the password is not stored in the user object.
+         */
+        state.loading = false;
+      })
+      .addCase(updateUserPassword.rejected, (state, action) => {
+        /**
+         * Password Update Failed
+         *
+         * Could be due to:
+         * - Wrong current password
+         * - Weak new password
+         * - Network error
+         */
+        state.loading = false;
+        state.error = (action.payload as string) ?? 'Failed to update password';
+      })
+
+      // =========================================================================
+      // UPDATE USER EMAIL (Phase 3)
+      // =========================================================================
+      /**
+       * Update User Email Reducers
+       *
+       * These handle the email change flow.
+       * Note: The email isn't actually changed until the user verifies it!
+       */
+      .addCase(updateUserEmail.pending, (state) => {
+        /**
+         * Email Update Started
+         *
+         * Show loading while we:
+         * 1. Reauthenticate the user
+         * 2. Send verification email to new address
+         */
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateUserEmail.fulfilled, (state) => {
+        /**
+         * Verification Email Sent Successfully
+         *
+         * A verification email has been sent to the new email address.
+         * The user's email is NOT changed yet - they must click the link.
+         *
+         * IMPORTANT: We don't update state.user.email here because
+         * the email hasn't actually changed yet. It will change when
+         * the user clicks the verification link, which will trigger
+         * onAuthStateChanged with the updated user object.
+         */
+        state.loading = false;
+      })
+      .addCase(updateUserEmail.rejected, (state, action) => {
+        /**
+         * Email Update Failed
+         *
+         * Could be due to:
+         * - Wrong current password
+         * - Email already in use
+         * - Invalid email format
+         * - Network error
+         */
+        state.loading = false;
+        state.error = (action.payload as string) ?? 'Failed to update email';
+      })
+
+      // =========================================================================
       // UPDATE PROFILE IMAGE
       // =========================================================================
       /**
@@ -1205,6 +1866,64 @@ const authSlice = createSlice({
          */
         state.profileImageLoading = false;
         state.profileImageError = (action.payload as string) ?? 'Failed to remove profile image';
+      })
+
+      // =========================================================================
+      // LOAD CACHED SESSION (SQLite)
+      // =========================================================================
+      /**
+       * Load Cached Session Reducers
+       *
+       * These handle loading the locally cached session from SQLite.
+       * This provides instant access to user data on app startup.
+       *
+       * IMPORTANT: This is for CACHE loading, not authentication!
+       * Firebase Auth still needs to verify the session.
+       */
+      .addCase(loadCachedSession.pending, (state) => {
+        /**
+         * Loading cached session
+         *
+         * We DON'T set loading = true here because:
+         * 1. This is a very fast operation (local SQLite)
+         * 2. We don't want to show a loading spinner for cache reads
+         * 3. The main loading indicator is for auth operations
+         */
+        // No state changes needed - keep it simple
+      })
+      .addCase(loadCachedSession.fulfilled, (state, action) => {
+        /**
+         * Cached Session Loaded
+         *
+         * If we have a cached user, we can show their info immediately.
+         * This is a "soft" authentication state - Firebase will verify later.
+         *
+         * IMPORTANT: We set user but NOT initialized!
+         * initialized = true only after Firebase Auth confirms.
+         * This prevents premature navigation to protected screens.
+         *
+         * UI BENEFIT:
+         * Even though we're not "officially" initialized, components
+         * can check if user exists to show cached data (like avatar).
+         */
+        if (action.payload.cachedUser) {
+          // Only set user if we don't already have one
+          // This prevents overwriting a more recent Firebase auth state
+          if (state.user === undefined) {
+            state.user = action.payload.cachedUser;
+          }
+        }
+        // Note: We do NOT set initialized = true here
+        // Firebase Auth will set that when it confirms the session
+      })
+      .addCase(loadCachedSession.rejected, (state) => {
+        /**
+         * Cache Load Failed
+         *
+         * SQLite error - not critical, just proceed without cache.
+         * Firebase Auth will handle authentication normally.
+         */
+        // No state changes - we just continue without cache
       });
   },
 });

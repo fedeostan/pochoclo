@@ -304,12 +304,20 @@ export const validateCustomTime = (
  * - categories: Array of category IDs (predefined or custom)
  * - dailyLearningMinutes: Number of minutes per day
  * - onboardingCompleted: Whether user finished onboarding
+ * - notifications: User's notification settings (optional, may not exist for older users)
  * - updatedAt: Timestamp of last update (null when creating)
+ *
+ * WHY IS notifications OPTIONAL?
+ * - Existing users won't have this field until they visit notification settings
+ * - We use DEFAULT_NOTIFICATION_PREFERENCES as fallback
+ * - Firestore documents can have different shapes (schema-less)
+ * - This allows gradual migration without data updates
  */
 export interface UserPreferences {
   categories: string[];
   dailyLearningMinutes: number;
   onboardingCompleted: boolean;
+  notifications?: NotificationPreferences;
   updatedAt: Date | null;
 }
 
@@ -324,6 +332,86 @@ export interface SavePreferencesInput {
   dailyLearningMinutes: number;
   onboardingCompleted?: boolean;
 }
+
+// =============================================================================
+// NOTIFICATION PREFERENCES
+// =============================================================================
+
+/**
+ * Notification Preferences Interface
+ *
+ * Stores user's notification settings. This is embedded within the UserPreferences
+ * object in Firestore, not as a separate collection.
+ *
+ * WHY THIS STRUCTURE?
+ * - Notifications are tightly coupled with user preferences
+ * - Loaded together with other preferences (single Firestore read)
+ * - Simple to update alongside other preference changes
+ *
+ * TIME FORMAT EXPLANATION:
+ * We store time as "HH:MM" string (24-hour format) instead of Date or timestamp.
+ * Reasons:
+ * - Timezone independence: "09:00" means 9 AM in the user's local timezone
+ * - Simpler storage: No timezone conversion needed
+ * - Easy to parse: Can split on ':' to get hours and minutes
+ * - Human readable: Developers can understand values at a glance
+ *
+ * EXAMPLE VALUES:
+ * - "09:00" → 9:00 AM
+ * - "14:30" → 2:30 PM
+ * - "20:00" → 8:00 PM
+ */
+export interface NotificationPreferences {
+  /**
+   * Whether daily notifications are enabled
+   *
+   * When false:
+   * - No notifications are scheduled
+   * - Time preference is preserved (for when user re-enables)
+   * - UI shows notifications as "off"
+   *
+   * When true:
+   * - Daily notification is scheduled at the specified time
+   * - User receives a reminder to learn
+   * - Requires system permission to be granted
+   */
+  enabled: boolean;
+
+  /**
+   * Time for daily notification in "HH:MM" format (24-hour)
+   *
+   * null means no time has been selected yet (edge case).
+   * Default is "09:00" (9:00 AM).
+   *
+   * IMPORTANT: This is LOCAL time, not UTC!
+   * The notification service will schedule based on the device's timezone.
+   */
+  time: string | null;
+}
+
+/**
+ * Default notification preferences
+ *
+ * These are used when:
+ * - User has no notification preferences saved yet
+ * - Initializing the notification settings screen
+ * - Resetting to defaults
+ *
+ * WHY DISABLED BY DEFAULT?
+ * - Best practice: Don't assume user wants notifications
+ * - User should actively opt-in
+ * - Avoids annoying users who didn't expect notifications
+ * - Respects user attention
+ *
+ * WHY 9:00 AM DEFAULT TIME?
+ * - Common "start of day" time for many people
+ * - Good time for a daily learning reminder
+ * - User can customize if they prefer another time
+ */
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  enabled: false,
+  time: '09:00',
+};
 
 /**
  * =============================================================================

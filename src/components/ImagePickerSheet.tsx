@@ -1,7 +1,7 @@
 /**
  * ImagePickerSheet Component
  *
- * A specialized bottom sheet for selecting profile images.
+ * A specialized modal bottom sheet for selecting profile images.
  * Provides two options: "Choose from Library" and "Take Photo".
  *
  * WHY A DEDICATED COMPONENT?
@@ -10,12 +10,22 @@
  * - Handles option rendering and callbacks
  * - Follows design system consistently
  *
+ * WHY USE BottomSheetModal INSTEAD OF BottomSheet?
+ * - BottomSheetModal renders ABOVE ALL other UI elements (including tab bar)
+ * - Regular BottomSheet renders within its parent view hierarchy
+ * - This ensures the picker covers the entire screen for focused interaction
+ * - Users won't accidentally tap navigation while selecting an option
+ *
  * USAGE:
  * This component works with the useImagePicker hook for the actual
  * image picking logic. This component just provides the UI.
  *
+ * IMPORTANT: API differences from regular BottomSheet:
+ * - Use present() instead of expand() to show
+ * - Use dismiss() instead of close() to hide
+ *
  * DESIGN SYSTEM:
- * - Uses our BottomSheet with proper styling
+ * - Uses our BottomSheetModal with proper styling
  * - Option rows with icons from Lucide
  * - Consistent spacing and typography
  */
@@ -23,8 +33,9 @@
 import React, { forwardRef, useCallback } from 'react';
 import { View, Pressable } from 'react-native';
 import { Image, Camera } from 'lucide-react-native';
-import { BottomSheet, Text } from '@/components/ui';
-import type { BottomSheetRef } from '@/components/ui/BottomSheet';
+// Using BottomSheetModal instead of BottomSheet so it renders ABOVE the tab bar
+import { BottomSheetModal, Text } from '@/components/ui';
+import type { BottomSheetModalRef } from '@/components/ui/BottomSheetModal';
 import { cn } from '@/utils';
 
 /**
@@ -62,24 +73,26 @@ interface OptionItem {
  * @example
  * ```tsx
  * function ProfileScreen() {
- *   const sheetRef = useRef<BottomSheetRef>(null);
+ *   const sheetRef = useRef<BottomSheetModalRef>(null);
  *   const { takePhoto, pickFromGallery } = useImagePicker();
  *
  *   const handleSelectGallery = async () => {
- *     sheetRef.current?.close();
+ *     // IMPORTANT: Use dismiss() not close() for BottomSheetModal
+ *     sheetRef.current?.dismiss();
  *     const result = await pickFromGallery();
  *     // Handle result...
  *   };
  *
  *   const handleSelectCamera = async () => {
- *     sheetRef.current?.close();
+ *     // IMPORTANT: Use dismiss() not close() for BottomSheetModal
+ *     sheetRef.current?.dismiss();
  *     const result = await takePhoto();
  *     // Handle result...
  *   };
  *
  *   return (
  *     <>
- *       <Avatar onPress={() => sheetRef.current?.expand()} />
+ *       <Avatar onPress={() => sheetRef.current?.present()} />
  *       <ImagePickerSheet
  *         ref={sheetRef}
  *         onSelectGallery={handleSelectGallery}
@@ -90,7 +103,7 @@ interface OptionItem {
  * }
  * ```
  */
-export const ImagePickerSheet = forwardRef<BottomSheetRef, ImagePickerSheetProps>(
+export const ImagePickerSheet = forwardRef<BottomSheetModalRef, ImagePickerSheetProps>(
   function ImagePickerSheet(
     { onSelectGallery, onSelectCamera, onClose },
     ref
@@ -159,10 +172,10 @@ export const ImagePickerSheet = forwardRef<BottomSheetRef, ImagePickerSheetProps
     }, []);
 
     return (
-      <BottomSheet
+      <BottomSheetModal
         ref={ref}
         snapPoints={['28%']}
-        onClose={onClose}
+        onDismiss={onClose}
         enablePanDownToClose
       >
         {/* Header */}
@@ -178,7 +191,7 @@ export const ImagePickerSheet = forwardRef<BottomSheetRef, ImagePickerSheetProps
             renderOption(option, index === options.length - 1)
           )}
         </View>
-      </BottomSheet>
+      </BottomSheetModal>
     );
   }
 );

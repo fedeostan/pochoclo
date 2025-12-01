@@ -6,11 +6,11 @@
  *
  * WHY USE A COLOR SYSTEM?
  * ========================
- * Instead of writing '#6200EE' everywhere in your code, you write colors.primary.
+ * Instead of writing '#6B8E7B' everywhere in your code, you write colors.primary.
  * Benefits:
- * 1. Consistency: All buttons use the same purple
+ * 1. Consistency: All buttons use the same sage green
  * 2. Maintainability: Change one value, updates everywhere
- * 3. Readability: colors.primary is clearer than '#6200EE'
+ * 3. Readability: colors.primary is clearer than '#6B8E7B'
  * 4. Flexibility: Easy to add dark mode or theme switching later
  *
  * COLOR NAMING CONVENTIONS:
@@ -31,22 +31,45 @@
  */
 export const colors = {
   /**
-   * PRIMARY COLOR - Main Brand Color
+   * PRIMARY COLOR - Soft Sage Green
    * Used for: Primary buttons, links, active states, main CTAs
    * This is the color users will most associate with your app
+   *
+   * NOTE: Updated to match tailwind.config.js - soft sage green is calming
+   * and nature-inspired, perfect for a learning app.
    */
-  primary: '#6200EE',        // Vibrant purple
-  primaryLight: '#7F39FB',   // Lighter shade for hover/pressed states
-  primaryDark: '#3700B3',    // Darker shade for emphasis
+  primary: '#6B8E7B',        // Soft sage green (matches Tailwind primary.DEFAULT)
+  primaryLight: '#9DBFAA',   // Lighter shade (primary-300)
+  primaryDark: '#446152',    // Darker shade (primary-600)
+  primaryForeground: '#FFFFFF', // White text on primary buttons
 
   /**
-   * SECONDARY COLOR - Complementary Accent
-   * Used for: Secondary buttons, highlights, floating action buttons
-   * Should complement (not clash with) your primary color
+   * SECONDARY COLOR - Warm neutral
+   * Used for: Secondary buttons, less prominent actions
    */
-  secondary: '#03DAC6',      // Teal/cyan
-  secondaryLight: '#66FFF9', // Lighter teal
-  secondaryDark: '#00A896',  // Darker teal
+  secondary: '#F5F5F4',      // Stone-100
+  secondaryForeground: '#44403C', // Stone-700
+
+  /**
+   * MUTED COLOR - For subtle elements
+   * Used for: Subtle text, backgrounds, less important elements
+   */
+  muted: '#F5F5F4',          // Stone-100
+  mutedForeground: '#78716C', // Stone-500 - for muted text and icons
+
+  /**
+   * ACCENT COLOR - Soft warm peach
+   * Used for: Highlights, special elements
+   */
+  accent: '#FEF3E7',         // Soft peach background
+  accentForeground: '#C2785C', // Warm terracotta text
+
+  /**
+   * DESTRUCTIVE COLOR - For errors and dangerous actions
+   * Soft enough to fit design, but clearly recognizable as "danger"
+   */
+  destructive: '#FCA5A5',    // Red-300 - soft but clearly red
+  destructiveForeground: '#991B1B', // Red-800 - dark red for good contrast
 
   /**
    * BACKGROUND COLORS - Surface Colors
@@ -57,9 +80,12 @@ export const colors = {
 
   /** Main app background - the canvas everything sits on */
   background: '#FAFAF9',     // Warm off-white (stone-50) - matches Tailwind bg-background
+  foreground: '#1C1917',     // Rich dark brown-gray (stone-900)
 
   /** Surface color - for cards, modals, sheets */
   surface: '#FFFFFF',        // Pure white for elevated content
+  card: '#FFFFFF',           // Card background (same as surface)
+  cardForeground: '#1C1917', // Card text color
 
   /** Alternative surface for variety or disabled states */
   surfaceAlt: '#FAFAFA',     // Slightly off-white
@@ -72,26 +98,28 @@ export const colors = {
    */
 
   /** Primary text - Main content, headings */
-  textPrimary: '#1C1C1E',    // Almost black (pure black can be harsh)
+  textPrimary: '#1C1917',    // Stone-900 (matches foreground)
 
   /** Secondary text - Supporting content, captions */
-  textSecondary: '#8E8E93',  // Medium gray
+  textSecondary: '#78716C',  // Stone-500 (matches mutedForeground)
 
   /** Tertiary text - Hints, placeholders, disabled text */
-  textTertiary: '#C7C7CC',   // Light gray
+  textTertiary: '#A8A29E',   // Stone-400
 
   /** Text on colored backgrounds (like buttons) */
-  textOnPrimary: '#FFFFFF',  // White text on purple buttons
-  textOnSecondary: '#000000', // Black text on teal buttons
+  textOnPrimary: '#FFFFFF',  // White text on primary buttons
+  textOnSecondary: '#44403C', // Dark text on secondary buttons
 
   /**
    * BORDER & DIVIDER COLORS
    * ========================
    * Subtle lines to separate content without being distracting
    */
-  border: '#E5E5EA',         // Light gray border
-  borderLight: '#F2F2F7',    // Very subtle border
-  divider: '#D1D1D6',        // Slightly more prominent divider
+  border: '#E7E5E4',         // Stone-200 (matches Tailwind border)
+  borderLight: '#F5F5F4',    // Stone-100 - very subtle border
+  divider: '#D6D3D1',        // Stone-300 - slightly more prominent divider
+  input: '#E7E5E4',          // Stone-200 - input borders
+  ring: '#6B8E7B',           // Primary color for focus rings
 
   /**
    * STATE COLORS - Feedback & Communication
@@ -148,8 +176,10 @@ export const colors = {
    * The format is rgba(red, green, blue, alpha)
    * Alpha is 0-1, where 0 is fully transparent and 1 is fully opaque
    */
-  primaryTransparent: 'rgba(98, 0, 238, 0.1)',   // 10% opacity primary
-  secondaryTransparent: 'rgba(3, 218, 198, 0.1)', // 10% opacity secondary
+  // Sage green RGB: 107, 142, 123
+  primaryTransparent: 'rgba(107, 142, 123, 0.1)',   // 10% opacity primary
+  // Stone-100 RGB: 245, 245, 244
+  secondaryTransparent: 'rgba(245, 245, 244, 0.5)', // 50% opacity secondary
 
 } as const; // 'as const' makes this readonly - prevents accidental modifications
 

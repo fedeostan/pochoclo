@@ -102,6 +102,25 @@ service cloud.firestore {
       }
 
       /**
+       * Recent Articles Subcollection
+       *
+       * Path: /users/{userId}/recentArticles/{docId}
+       *
+       * Tracks the most recently read articles for quick access on home screen.
+       * Limited to a small number (e.g., 3) to show recent reading activity.
+       *
+       * DOCUMENT STRUCTURE:
+       * {
+       *   contentBody: { title, summary, body, ... },
+       *   readAt: timestamp,
+       *   createdAt: timestamp
+       * }
+       */
+      match /recentArticles/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      /**
        * User Preferences Subcollection (if used)
        *
        * Path: /users/{userId}/preferences/{prefId}

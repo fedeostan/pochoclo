@@ -27,6 +27,7 @@
 import { View, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { Text, Button } from '@/components/ui';
 import { Check } from 'lucide-react-native';
 
@@ -48,6 +49,18 @@ import { Check } from 'lucide-react-native';
  * - Automatically handles back button behavior
  */
 export default function WelcomeScreen() {
+  /**
+   * Translation Hook
+   *
+   * useTranslation('auth') loads translations from the 'auth' namespace.
+   * The 't' function is used to get translated strings by their key.
+   *
+   * EXAMPLE:
+   * t('welcome.appName') → "POCHOCLO" (en) or "POCHOCLO" (es)
+   * t('welcome.tagline') → "Your personal..." (en) or "Tu compañero..." (es)
+   */
+  const { t } = useTranslation('auth');
+
   /**
    * Navigation Handler: Navigate to Sign In
    *
@@ -112,7 +125,7 @@ export default function WelcomeScreen() {
            * Primary color for brand identity.
            */}
           <Text variant="h1" className="text-primary mb-2 text-center">
-            POCHOCLO
+            {t('welcome.appName')}
           </Text>
 
           {/**
@@ -122,7 +135,7 @@ export default function WelcomeScreen() {
            * Uses lead variant (larger body text) with muted color.
            */}
           <Text variant="lead" className="text-center px-4 max-w-xs">
-            Your personal learning companion for React Native development
+            {t('welcome.tagline')}
           </Text>
         </View>
 
@@ -133,9 +146,9 @@ export default function WelcomeScreen() {
          * Centered with consistent spacing between items.
          */}
         <View className="items-center mb-8">
-          <FeatureItem text="Learn by doing with real-world examples" />
-          <FeatureItem text="Comprehensive educational comments" />
-          <FeatureItem text="Best practices from day one" />
+          <FeatureItem text={t('welcome.features.feature1')} />
+          <FeatureItem text={t('welcome.features.feature2')} />
+          <FeatureItem text={t('welcome.features.feature3')} />
         </View>
 
         {/**
@@ -157,7 +170,7 @@ export default function WelcomeScreen() {
            * Full width for easy tapping.
            */}
           <Button onPress={handleSignUp}>
-            Create Account
+            {t('welcome.createAccount')}
           </Button>
 
           {/**
@@ -167,7 +180,7 @@ export default function WelcomeScreen() {
            * Uses secondary variant (subtle gray background).
            */}
           <Button variant="secondary" onPress={handleSignIn}>
-            Sign In
+            {t('welcome.signIn')}
           </Button>
 
           {/**
@@ -177,7 +190,7 @@ export default function WelcomeScreen() {
            * In production, these would be links to actual pages.
            */}
           <Text variant="muted" className="text-center mt-4 px-4">
-            By continuing, you agree to our Terms of Service and Privacy Policy
+            {t('welcome.terms')}
           </Text>
         </View>
       </View>

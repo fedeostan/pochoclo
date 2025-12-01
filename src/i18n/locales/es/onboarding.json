@@ -1,0 +1,67 @@
+{
+  "categorySelection": {
+    "title": "¿Sobre qué quieres aprender?",
+    "subtitle": "Selecciona temas que te interesen. Siempre puedes cambiar esto después.",
+    "popularTopics": "Temas Populares",
+    "yourTopics": "Tus Temas",
+    "addCustomTopic": "Agregar tema personalizado",
+    "addCustomTitle": "Agregar un tema personalizado",
+    "customPlaceholder": "ej., Blockchain, Machine Learning",
+    "continueWithCount": "Continuar ({{count}} seleccionados)",
+    "selectAtLeast": "Selecciona al menos 1 tema"
+  },
+  "timeSelection": {
+    "step": "Paso {{current}} de {{total}}",
+    "title": "¿Cuánto tiempo tienes?",
+    "subtitle": "Personalizaremos tu contenido según tu disponibilidad.",
+    "other": {
+      "label": "Otro",
+      "description": "Establece tu propio tiempo",
+      "placeholder": "Ingresa minutos ({{min}}-{{max}})",
+      "unit": "min/día"
+    },
+    "button": "Comenzar"
+  },
+  "timeOptions": {
+    "5min": {
+      "label": "5 minutos al día",
+      "description": "Información rápida diaria"
+    },
+    "10min": {
+      "label": "10 minutos al día",
+      "description": "Sesiones cortas enfocadas"
+    },
+    "15min": {
+      "label": "15 minutos al día",
+      "description": "Aprendizaje balanceado"
+    },
+    "30min": {
+      "label": "30 minutos al día",
+      "description": "Sesiones de inmersión profunda"
+    }
+  },
+  "categories": {
+    "technology": "Tecnología",
+    "science": "Ciencia",
+    "business": "Negocios",
+    "health-fitness": "Salud y Fitness",
+    "arts-culture": "Arte y Cultura",
+    "history": "Historia",
+    "psychology": "Psicología",
+    "finance": "Finanzas",
+    "languages": "Idiomas",
+    "philosophy": "Filosofía",
+    "environment": "Medio Ambiente",
+    "politics": "Política",
+    "design": "Diseño"
+  },
+  "errors": {
+    "authRequired": "Necesitas iniciar sesión para guardar tus preferencias. Por favor inicia sesión nuevamente.",
+    "saveFailed": "No se pudieron guardar tus preferencias. Por favor verifica tu conexión e intenta de nuevo."
+  },
+  "alerts": {
+    "authErrorTitle": "Error de autenticación",
+    "saveFailedTitle": "Error al guardar",
+    "retry": "Reintentar"
+  }
+}

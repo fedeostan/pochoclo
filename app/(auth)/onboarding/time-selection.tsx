@@ -52,6 +52,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import {
   Text,
   Button,
@@ -87,6 +88,15 @@ import {
  * - Bottom Section (Get Started button)
  */
 export default function TimeSelectionScreen() {
+  /**
+   * Translation Hooks
+   *
+   * useTranslation('onboarding') loads translations from the 'onboarding' namespace.
+   * We also use 'common' for shared validation messages and button text.
+   */
+  const { t } = useTranslation('onboarding');
+  const { t: tCommon } = useTranslation('common');
+
   /**
    * Redux Hooks
    *
@@ -270,9 +280,9 @@ export default function TimeSelectionScreen() {
     if (!user?.uid) {
       // Show user-facing error instead of silent failure
       Alert.alert(
-        'Authentication Error',
-        'You need to be signed in to save preferences. Please sign in again.',
-        [{ text: 'OK' }]
+        tCommon('error.authRequired'),
+        tCommon('error.authRequiredMessage'),
+        [{ text: tCommon('button.ok') }]
       );
       return;
     }
@@ -300,11 +310,11 @@ export default function TimeSelectionScreen() {
       // Error is already set in Redux state
       // Show alert with retry option for better UX
       Alert.alert(
-        'Save Failed',
-        'Could not save your preferences. Please check your connection and try again.',
+        tCommon('error.saveFailed'),
+        tCommon('error.saveFailedMessage'),
         [
-          { text: 'OK', style: 'cancel' },
-          { text: 'Retry', onPress: handleGetStarted },
+          { text: tCommon('button.ok'), style: 'cancel' },
+          { text: tCommon('button.retry'), onPress: handleGetStarted },
         ]
       );
       console.error('Failed to save preferences:', err);
@@ -358,7 +368,7 @@ export default function TimeSelectionScreen() {
                 <View className="w-3 h-3 rounded-full bg-primary" />
               </View>
               <Text variant="small" className="text-muted-foreground text-center">
-                Step 2 of 2
+                {t('timeSelection.step', { current: 2, total: 2 })}
               </Text>
             </View>
 
@@ -367,10 +377,10 @@ export default function TimeSelectionScreen() {
              */}
             <View className="mb-8">
               <Text variant="h1" className="mb-2">
-                How much time do you have?
+                {t('timeSelection.title')}
               </Text>
               <Text variant="lead">
-                We'll personalize your content based on your availability.
+                {t('timeSelection.subtitle')}
               </Text>
             </View>
 
@@ -405,8 +415,8 @@ export default function TimeSelectionScreen() {
                * Shows input field when selected.
                */}
               <TimeOptionCard
-                label="Other"
-                description="Set your own time"
+                label={t('timeSelection.other.label')}
+                description={t('timeSelection.other.description')}
                 selected={isOtherSelected}
                 onPress={handleSelectOther}
                 isOtherOption
@@ -422,7 +432,7 @@ export default function TimeSelectionScreen() {
                     <View className="flex-row items-center gap-2">
                       <TextInput
                         className="flex-1 bg-background rounded-lg px-4 py-3 text-foreground border border-border"
-                        placeholder={`Enter minutes (${CUSTOM_TIME_MIN}-${CUSTOM_TIME_MAX})`}
+                        placeholder={t('timeSelection.other.placeholder', { min: CUSTOM_TIME_MIN, max: CUSTOM_TIME_MAX })}
                         placeholderTextColor="#78716C"
                         value={customMinutesInput}
                         onChangeText={handleCustomMinutesChange}
@@ -431,7 +441,7 @@ export default function TimeSelectionScreen() {
                         maxLength={3}
                         autoFocus
                       />
-                      <Text className="text-muted-foreground">min/day</Text>
+                      <Text className="text-muted-foreground">{t('timeSelection.other.unit')}</Text>
                     </View>
 
                     {/* Validation Error */}
@@ -472,7 +482,7 @@ export default function TimeSelectionScreen() {
             disabled={!isFormValid || saving}
             isLoading={saving}
           >
-            Get Started
+            {t('timeSelection.button')}
           </Button>
         </View>
       </KeyboardAvoidingView>

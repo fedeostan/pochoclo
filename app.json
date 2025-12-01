@@ -25,7 +25,14 @@
         "backgroundColor": "#FAFAF9"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#6B8E7B"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -39,7 +46,15 @@
           "photosPermission": "POCHOCLO needs access to your photo library to choose a profile picture.",
           "cameraPermission": "POCHOCLO needs access to your camera to take profile photos."
         }
-      ]
-    ]
+      ],
+      "expo-web-browser",
+      "expo-sqlite"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5d079c58-50ca-4f12-8197-a202f856996b"
+      }
+    }
   }
 }

@@ -202,6 +202,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFAF9',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    // IMPORTANT: overflow: 'hidden' is required for Android to properly
+    // clip content to the border radius. Without this, Android may show
+    // square corners even with borderRadius set.
+    overflow: 'hidden',
     // Shadow for iOS
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },

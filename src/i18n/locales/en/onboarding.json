@@ -1,0 +1,67 @@
+{
+  "categorySelection": {
+    "title": "What do you want to learn about?",
+    "subtitle": "Select topics that interest you. You can always change this later.",
+    "popularTopics": "Popular Topics",
+    "yourTopics": "Your Topics",
+    "addCustomTopic": "Add Custom Topic",
+    "addCustomTitle": "Add a custom topic",
+    "customPlaceholder": "e.g., Blockchain, Machine Learning",
+    "continueWithCount": "Continue ({{count}} selected)",
+    "selectAtLeast": "Select at least 1 topic"
+  },
+  "timeSelection": {
+    "step": "Step {{current}} of {{total}}",
+    "title": "How much time do you have?",
+    "subtitle": "We'll personalize your content based on your availability.",
+    "other": {
+      "label": "Other",
+      "description": "Set your own time",
+      "placeholder": "Enter minutes ({{min}}-{{max}})",
+      "unit": "min/day"
+    },
+    "button": "Get Started"
+  },
+  "timeOptions": {
+    "5min": {
+      "label": "5 minutes a day",
+      "description": "Quick daily insights"
+    },
+    "10min": {
+      "label": "10 minutes a day",
+      "description": "Short focused sessions"
+    },
+    "15min": {
+      "label": "15 minutes a day",
+      "description": "Balanced learning"
+    },
+    "30min": {
+      "label": "30 minutes a day",
+      "description": "Deep dive sessions"
+    }
+  },
+  "categories": {
+    "technology": "Technology",
+    "science": "Science",
+    "business": "Business",
+    "health-fitness": "Health & Fitness",
+    "arts-culture": "Arts & Culture",
+    "history": "History",
+    "psychology": "Psychology",
+    "finance": "Finance",
+    "languages": "Languages",
+    "philosophy": "Philosophy",
+    "environment": "Environment",
+    "politics": "Politics",
+    "design": "Design"
+  },
+  "errors": {
+    "authRequired": "You need to be signed in to save preferences. Please sign in again.",
+    "saveFailed": "Could not save your preferences. Please check your connection and try again."
+  },
+  "alerts": {
+    "authErrorTitle": "Authentication Error",
+    "saveFailedTitle": "Save Failed",
+    "retry": "Retry"
+  }
+}

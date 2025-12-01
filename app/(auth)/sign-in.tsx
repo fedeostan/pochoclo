@@ -43,6 +43,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { Text, Button, Input, NavBar, useNavBarHeight } from '@/components/ui';
 import { useAppDispatch, useAppSelector } from '@/store';
 import { signIn, clearError } from '@/store/slices/authSlice';
@@ -67,6 +68,15 @@ import { validateEmail } from '@/utils/validation';
  * Redux for auth state (comes from async thunk, shared across app).
  */
 export default function SignInScreen() {
+  /**
+   * Translation Hooks
+   *
+   * useTranslation('auth') loads translations from the 'auth' namespace.
+   * We also use 'common' for shared validation messages.
+   */
+  const { t } = useTranslation('auth');
+  const { t: tCommon } = useTranslation('common');
+
   /**
    * Redux Hooks
    *
@@ -192,7 +202,7 @@ export default function SignInScreen() {
 
     // Validate password length (safety check)
     if (password.length < 6) {
-      setValidationError('Password must be at least 6 characters');
+      setValidationError(tCommon('validation.passwordMinLength'));
       return;
     }
 
@@ -322,10 +332,10 @@ export default function SignInScreen() {
             <View className="mb-8">
               {/* Screen Title */}
               <Text variant="h1" className="mb-2">
-                Welcome Back
+                {t('signIn.title')}
               </Text>
               <Text variant="lead">
-                Sign in to continue your journey
+                {t('signIn.subtitle')}
               </Text>
             </View>
 
@@ -338,8 +348,8 @@ export default function SignInScreen() {
             <View className="gap-4">
               {/* Email Input */}
               <Input
-                label="Email"
-                placeholder="your.email@example.com"
+                label={t('signIn.emailLabel')}
+                placeholder={t('signIn.emailPlaceholder')}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -350,8 +360,8 @@ export default function SignInScreen() {
 
               {/* Password Input */}
               <Input
-                label="Password"
-                placeholder="Enter your password"
+                label={t('signIn.passwordLabel')}
+                placeholder={t('signIn.passwordPlaceholder')}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
@@ -365,7 +375,7 @@ export default function SignInScreen() {
                 disabled={true} // Enable in Phase 7
                 className="self-end -mt-2"
               >
-                <Text variant="muted">Forgot password?</Text>
+                <Text variant="muted">{t('signIn.forgotPassword')}</Text>
               </Pressable>
             </View>
 
@@ -421,7 +431,7 @@ export default function SignInScreen() {
             disabled={loading || !isFormValid}
             className="mb-3"
           >
-            Sign In
+            {t('signIn.button')}
           </Button>
 
           {/**
@@ -431,9 +441,9 @@ export default function SignInScreen() {
            * Grouped with button for cohesive bottom action area.
            */}
           <View className="flex-row justify-center items-center py-2">
-            <Text variant="muted">Don't have an account? </Text>
+            <Text variant="muted">{t('signIn.noAccount')} </Text>
             <Pressable onPress={handleCreateAccount}>
-              <Text className="text-primary font-semibold">Create one</Text>
+              <Text className="text-primary font-semibold">{t('signIn.createOne')}</Text>
             </Pressable>
           </View>
         </View>

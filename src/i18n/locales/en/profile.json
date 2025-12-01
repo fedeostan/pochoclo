@@ -1,0 +1,115 @@
+{
+  "header": {
+    "memberSince": "Member since {{date}}"
+  },
+  "sections": {
+    "myLearning": "My Learning",
+    "notifications": "Notifications",
+    "account": "Account",
+    "support": "Support"
+  },
+  "status": {
+    "disabled": "Disabled",
+    "enabled": "Enabled",
+    "notSet": "Not set",
+    "notConfigured": "Not configured",
+    "verified": "Verified",
+    "notVerified": "Not Verified"
+  },
+  "time": {
+    "minutesDay": "{{count}} minutes a day"
+  },
+  "settings": {
+    "learningPreferences": "Learning Preferences",
+    "dailyReminder": "Daily Reminder",
+    "reminderTime": "Reminder Time",
+    "changeEmail": "Change Email",
+    "changePassword": "Change Password",
+    "emailVerified": "Email Verified",
+    "helpFaq": "Help & FAQ",
+    "sendFeedback": "Send Feedback",
+    "about": "About POCHOCLO",
+    "version": "Version {{version}}"
+  },
+  "signOut": {
+    "button": "Sign Out"
+  },
+  "imagePicker": {
+    "title": "Change Profile Photo",
+    "takePhoto": "Take Photo",
+    "chooseGallery": "Choose from Gallery",
+    "cancel": "Cancel"
+  },
+  "timePicker": {
+    "title": "Set Reminder Time",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "notifications": {
+    "permissionTitle": "Enable Notifications",
+    "permissionMessage": "POCHOCLO would like to send you a daily reminder to continue your learning journey. You can change this anytime in Settings.",
+    "permissionAllow": "Allow",
+    "permissionNotNow": "Not Now",
+    "settingsTitle": "Notifications Disabled",
+    "settingsMessage": "To enable notifications, please go to your device Settings and allow notifications for POCHOCLO.",
+    "settingsButton": "Open Settings",
+    "errorEnable": "Could not enable notifications. Please try again.",
+    "errorTime": "Could not update notification time. Please try again."
+  },
+  "alerts": {
+    "uploadFailed": "Upload Failed",
+    "cannotOpenEmail": "Cannot Open Email",
+    "emailFallback": "Please send feedback to feedback@pochoclo.app",
+    "errorTitle": "Error",
+    "errorOpenEmail": "Could not open email client"
+  },
+  "editPreferences": {
+    "title": "Edit Preferences",
+    "categoriesSection": "Topics",
+    "timeSection": "Daily Goal",
+    "saveButton": "Save Changes"
+  },
+  "changeEmail": {
+    "title": "Change Email",
+    "currentEmail": "Current Email",
+    "newEmail": "New Email",
+    "newEmailPlaceholder": "Enter new email address",
+    "password": "Confirm Password",
+    "passwordPlaceholder": "Enter your current password",
+    "button": "Update Email",
+    "success": "Email updated successfully"
+  },
+  "changePassword": {
+    "title": "Change Password",
+    "currentPassword": "Current Password",
+    "currentPasswordPlaceholder": "Enter current password",
+    "newPassword": "New Password",
+    "newPasswordPlaceholder": "Enter new password",
+    "confirmPassword": "Confirm New Password",
+    "confirmPasswordPlaceholder": "Confirm new password",
+    "button": "Update Password",
+    "success": "Password updated successfully"
+  },
+  "help": {
+    "title": "Help & FAQ",
+    "searchPlaceholder": "Search help topics...",
+    "categories": {
+      "gettingStarted": "Getting Started",
+      "content": "Content & Learning",
+      "account": "Account & Settings",
+      "notifications": "Notifications",
+      "troubleshooting": "Troubleshooting"
+    }
+  },
+  "about": {
+    "title": "About POCHOCLO",
+    "description": "POCHOCLO is your personal AI-powered learning companion. We deliver personalized content based on your interests and available time.",
+    "version": "Version",
+    "madeWith": "Made with love for learners everywhere",
+    "links": {
+      "privacyPolicy": "Privacy Policy",
+      "termsOfService": "Terms of Service",
+      "openSource": "Open Source Licenses"
+    }
+  }
+}

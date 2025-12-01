@@ -268,6 +268,32 @@ export async function toggleSavedContent(
 }
 
 /**
+ * Get Saved Content Count
+ *
+ * Returns the total number of saved articles for a user.
+ * Used for the MinimalStatsBar component to show saved count.
+ *
+ * @param userId - The Firebase Auth UID of the current user
+ * @returns Promise<number> - Total count of saved articles
+ *
+ * USAGE:
+ * ```typescript
+ * const savedCount = await getSavedContentCount(userId);
+ * // Returns: 5
+ * ```
+ */
+export async function getSavedContentCount(userId: string): Promise<number> {
+  try {
+    const savedRef = collection(db, 'users', userId, 'savedContent');
+    const snapshot = await getDocs(savedRef);
+    return snapshot.size;
+  } catch (error) {
+    console.error('[savedContentService] Error getting saved count:', error);
+    return 0;
+  }
+}
+
+/**
  * =============================================================================
  * LEARNING NOTES
  * =============================================================================

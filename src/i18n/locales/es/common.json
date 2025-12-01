@@ -1,0 +1,58 @@
+{
+  "button": {
+    "continue": "Continuar",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "done": "Listo",
+    "add": "Agregar",
+    "remove": "Eliminar",
+    "tryAgain": "Intentar de nuevo",
+    "retry": "Reintentar",
+    "ok": "OK",
+    "close": "Cerrar",
+    "signOut": "Cerrar sesión",
+    "getStarted": "Comenzar"
+  },
+  "validation": {
+    "required": "Este campo es requerido",
+    "emailRequired": "El correo es requerido",
+    "emailInvalid": "Por favor ingresa un correo válido",
+    "passwordRequired": "La contraseña es requerida",
+    "passwordMinLength": "La contraseña debe tener al menos 6 caracteres",
+    "passwordsDoNotMatch": "Las contraseñas no coinciden",
+    "categoryMinLength": "El nombre de la categoría debe tener al menos 2 caracteres",
+    "categoryMaxLength": "El nombre de la categoría debe tener 50 caracteres o menos",
+    "categoryInvalidChars": "Solo se permiten letras, números y espacios",
+    "categoryExists": "Esta categoría ya existe",
+    "categoryAlreadySelected": "Esta categoría ya está seleccionada",
+    "timeMinimum": "El mínimo es {{min}} minutos",
+    "timeMaximum": "El máximo es {{max}} minutos",
+    "timeInvalid": "Por favor ingresa un número entero"
+  },
+  "error": {
+    "generic": "Algo salió mal",
+    "network": "Por favor verifica tu conexión a internet",
+    "tryAgain": "Por favor intenta de nuevo",
+    "authRequired": "Error de autenticación",
+    "authRequiredMessage": "Necesitas iniciar sesión para guardar tus preferencias. Por favor inicia sesión nuevamente.",
+    "saveFailed": "Error al guardar",
+    "saveFailedMessage": "No se pudieron guardar tus preferencias. Por favor verifica tu conexión e intenta de nuevo."
+  },
+  "time": {
+    "minRead": "{{count}} min de lectura",
+    "minutesPerDay": "{{count}} minutos al día"
+  },
+  "status": {
+    "loading": "Cargando...",
+    "saving": "Guardando...",
+    "enabled": "Activado",
+    "disabled": "Desactivado",
+    "verified": "Verificado",
+    "notVerified": "No verificado",
+    "notSet": "No establecido",
+    "notConfigured": "No configurado"
+  },
+  "step": {
+    "stepOf": "Paso {{current}} de {{total}}"
+  }
+}

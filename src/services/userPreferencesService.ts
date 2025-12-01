@@ -42,6 +42,7 @@ import { db } from '@/config/firebase';
 import {
   UserPreferences,
   SavePreferencesInput,
+  NotificationPreferences,
 } from '@/types/preferences';
 
 /**
@@ -65,11 +66,13 @@ const USERS_COLLECTION = 'users';
  *
  * This differs from UserPreferences because:
  * - updatedAt is a Firestore Timestamp, not a JS Date
+ * - notifications is stored directly (no conversion needed)
  */
 interface FirestorePreferences {
   categories: string[];
   dailyLearningMinutes: number;
   onboardingCompleted: boolean;
+  notifications?: NotificationPreferences;
   updatedAt: Timestamp | null;
 }
 
@@ -126,6 +129,9 @@ export const getUserPreferences = async (
       categories: preferences.categories || [],
       dailyLearningMinutes: preferences.dailyLearningMinutes || 0,
       onboardingCompleted: preferences.onboardingCompleted || false,
+      // Notifications are stored as-is (no timestamp conversion needed)
+      // If not present, we'll use defaults in the consuming code
+      notifications: preferences.notifications,
       updatedAt: preferences.updatedAt?.toDate() || null,
     };
 
@@ -352,6 +358,86 @@ export const getContentRequestStatus = async (
   } catch (error) {
     console.error('Error getting content request status:', error);
     return { contentRequested: false, lastContentRequestId: null };
+  }
+};
+
+/**
+ * =============================================================================
+ * NOTIFICATION PREFERENCES
+ * =============================================================================
+ */
+
+/**
+ * Update notification preferences in Firestore
+ *
+ * @param userId - The user's UID
+ * @param notifications - The notification preferences to save
+ * @returns Promise that resolves when saved
+ *
+ * HOW THIS WORKS:
+ * We use DOT NOTATION to update only the notifications field within preferences.
+ * This is crucial - without dot notation, updateDoc would overwrite the entire
+ * preferences object!
+ *
+ * FIRESTORE PATH:
+ * users/{userId}
+ *   └── preferences
+ *         ├── categories: [...] (NOT touched)
+ *         ├── dailyLearningMinutes: 15 (NOT touched)
+ *         ├── notifications: { enabled: true, time: "09:00" } (UPDATED)
+ *         └── updatedAt: <timestamp> (UPDATED)
+ *
+ * WHY A SEPARATE FUNCTION?
+ * - Notifications are updated independently of other preferences
+ * - Cleaner API for the notification settings screen
+ * - Follows single-responsibility principle
+ * - Easier to test notification-specific updates
+ *
+ * WHEN TO USE:
+ * - User toggles notifications on/off in settings
+ * - User changes notification time in settings
+ * - Initial notification setup after onboarding
+ *
+ * USAGE:
+ * await updateNotificationPreferences(userId, {
+ *   enabled: true,
+ *   time: '09:00',
+ * });
+ */
+export const updateNotificationPreferences = async (
+  userId: string,
+  notifications: NotificationPreferences
+): Promise<void> => {
+  try {
+    const userRef = doc(db, USERS_COLLECTION, userId);
+
+    // Use dot notation to update only the notifications field
+    // 'preferences.notifications' targets the nested notifications object
+    // without affecting other fields like categories or dailyLearningMinutes
+    //
+    // WHY DOT NOTATION?
+    // updateDoc with { preferences: { notifications: {...} } } would
+    // REPLACE the entire preferences object, losing categories and time!
+    //
+    // updateDoc with { 'preferences.notifications': {...} } only
+    // updates the notifications field within preferences.
+    const updateData: Record<string, unknown> = {
+      'preferences.notifications': {
+        enabled: notifications.enabled,
+        time: notifications.time,
+      },
+      'preferences.updatedAt': serverTimestamp(),
+    };
+
+    await updateDoc(userRef, updateData);
+
+    console.log('[PreferencesService] Notification preferences updated:', notifications);
+
+  } catch (error) {
+    console.error('Error updating notification preferences:', error);
+    throw new Error(
+      `Failed to update notification preferences: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
 };
 

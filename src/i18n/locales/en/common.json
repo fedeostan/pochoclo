@@ -1,0 +1,58 @@
+{
+  "button": {
+    "continue": "Continue",
+    "cancel": "Cancel",
+    "save": "Save",
+    "done": "Done",
+    "add": "Add",
+    "remove": "Remove",
+    "tryAgain": "Try Again",
+    "retry": "Retry",
+    "ok": "OK",
+    "close": "Close",
+    "signOut": "Sign Out",
+    "getStarted": "Get Started"
+  },
+  "validation": {
+    "required": "This field is required",
+    "emailRequired": "Email is required",
+    "emailInvalid": "Please enter a valid email address",
+    "passwordRequired": "Password is required",
+    "passwordMinLength": "Password must be at least 6 characters",
+    "passwordsDoNotMatch": "Passwords do not match",
+    "categoryMinLength": "Category name must be at least 2 characters",
+    "categoryMaxLength": "Category name must be 50 characters or less",
+    "categoryInvalidChars": "Only letters, numbers, and spaces are allowed",
+    "categoryExists": "This category already exists",
+    "categoryAlreadySelected": "This category is already selected",
+    "timeMinimum": "Minimum is {{min}} minutes",
+    "timeMaximum": "Maximum is {{max}} minutes",
+    "timeInvalid": "Please enter a whole number"
+  },
+  "error": {
+    "generic": "Something went wrong",
+    "network": "Please check your internet connection",
+    "tryAgain": "Please try again",
+    "authRequired": "Authentication Error",
+    "authRequiredMessage": "You need to be signed in to save preferences. Please sign in again.",
+    "saveFailed": "Save Failed",
+    "saveFailedMessage": "Could not save your preferences. Please check your connection and try again."
+  },
+  "time": {
+    "minRead": "{{count}} min read",
+    "minutesPerDay": "{{count}} minutes a day"
+  },
+  "status": {
+    "loading": "Loading...",
+    "saving": "Saving...",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "verified": "Verified",
+    "notVerified": "Not Verified",
+    "notSet": "Not set",
+    "notConfigured": "Not configured"
+  },
+  "step": {
+    "stepOf": "Step {{current}} of {{total}}"
+  }
+}

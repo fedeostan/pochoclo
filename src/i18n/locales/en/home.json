@@ -1,0 +1,33 @@
+{
+  "stats": {
+    "thisWeek": "this week",
+    "saved": "saved"
+  },
+  "error": {
+    "title": "Something went wrong",
+    "tryAgain": "Try Again"
+  },
+  "empty": {
+    "title": "Ready to learn something new?",
+    "subtitle": "Your personalized content is waiting.",
+    "button": "Get Content"
+  },
+  "hint": {
+    "pullToRefresh": "Pull down to skip and get new content"
+  },
+  "postReading": {
+    "articleSingular": "article this week",
+    "articlePlural": "articles this week",
+    "encouragement": {
+      "start": "Great start!",
+      "rolling": "You're on a roll!",
+      "keepUp": "Nice! Keep it up!",
+      "impressive": "Impressive week!",
+      "crushing": "You're crushing it!",
+      "incredible": "Incredible dedication!"
+    },
+    "readyToStart": "Ready to start learning?",
+    "getMore": "Get More Content",
+    "maybeLater": "That's enough for now"
+  }
+}

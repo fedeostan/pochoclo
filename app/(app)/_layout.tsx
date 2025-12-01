@@ -3,7 +3,7 @@
  *
  * This layout provides the main navigation structure for authenticated users.
  * It uses Expo Router's Tabs component to create a bottom tab bar with
- * three main sections: Home, Discover, and Profile.
+ * three main sections: Home, Saved, and Profile.
  *
  * WHAT IS TAB NAVIGATION?
  * Tab navigation is a pattern where the main sections of an app are accessible
@@ -22,7 +22,7 @@
  */
 
 import { Tabs } from 'expo-router';
-import { Home, Compass, User } from 'lucide-react-native';
+import { Home, Bookmark, User } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /**
@@ -60,8 +60,8 @@ const ICON_SIZE = 24;
  * AppLayout Component - Tab Navigator
  *
  * Configures the bottom tab bar with three tabs:
- * - Home: Main dashboard showing user data (home.tsx)
- * - Discover: Content discovery section (discover.tsx)
+ * - Home: Main dashboard showing AI-generated content (home.tsx)
+ * - Saved: Saved/bookmarked articles for later reading (saved.tsx)
  * - Profile: User profile and settings (profile.tsx)
  *
  * TABS VS STACK:
@@ -236,24 +236,25 @@ export default function AppLayout() {
       />
 
       {/**
-       * DISCOVER TAB
+       * SAVED TAB
        *
-       * Content discovery section for exploring new content.
-       * name="discover" maps to discover.tsx file.
+       * Saved articles section where users can find all their bookmarked content.
+       * When a user saves an article from the Home screen, it appears here.
+       * name="saved" maps to saved.tsx file.
        */}
       <Tabs.Screen
-        name="discover"
+        name="saved"
         options={{
-          title: 'Discover',
+          title: 'Saved',
           /**
-           * Compass Icon
+           * Bookmark Icon
            *
-           * The Compass represents exploration and discovery.
-           * It's a common icon choice for "discover" or "explore" sections.
-           * Alternatives: Search, Grid, Globe
+           * The Bookmark icon clearly represents saved/bookmarked content.
+           * This is the standard icon for saved items across most apps.
+           * Users intuitively understand bookmarks = saved for later.
            */
           tabBarIcon: ({ color, focused }) => (
-            <Compass
+            <Bookmark
               size={ICON_SIZE}
               color={color}
               strokeWidth={focused ? 2.5 : 2}
@@ -287,6 +288,31 @@ export default function AppLayout() {
           ),
         }}
       />
+
+      {/**
+       * NOTE ON PROFILE SUB-SCREENS
+       *
+       * Profile sub-screens (edit preferences, change email, change password,
+       * help, about) are now implemented as full-screen bottom sheet MODALS
+       * instead of separate routes.
+       *
+       * WHY MODALS INSTEAD OF NAVIGATION?
+       * ==================================
+       * Tab navigators are "flat" - they don't maintain a proper navigation stack.
+       * When users navigated from Profile to sub-screens and pressed back,
+       * it often returned to Home instead of Profile due to how Expo Router
+       * handles nested navigation in Tab navigators.
+       *
+       * MODAL SOLUTION BENEFITS:
+       * ========================
+       * 1. Modals don't affect navigation stack
+       * 2. Dismissing always returns to exactly where modal was opened
+       * 3. Better UX: content feels contained within Profile context
+       * 4. Simpler architecture: no route groups or Stack navigators needed
+       *
+       * The modals are defined in src/components/profile/ and rendered
+       * in profile.tsx using refs (present()/dismiss() pattern).
+       */}
     </Tabs>
   );
 }
@@ -300,7 +326,7 @@ export default function AppLayout() {
  *
  * 2. FILE-TO-TAB MAPPING
  *    - home.tsx → Home tab
- *    - discover.tsx → Discover tab
+ *    - saved.tsx → Saved tab
  *    - profile.tsx → Profile tab
  *
  *    The "name" prop in Tabs.Screen must match the filename (without .tsx).

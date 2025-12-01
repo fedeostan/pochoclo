@@ -63,10 +63,10 @@ const CONFIG = {
    * Timeout in milliseconds
    *
    * How long to wait for content before giving up.
-   * AI generation typically takes 10-30 seconds.
-   * We set 60 seconds to be safe.
+   * AI generation typically takes 30-60 seconds depending on complexity.
+   * We set 90 seconds to be safe, allowing for slower responses.
    */
-  TIMEOUT_MS: 60_000,
+  TIMEOUT_MS: 90_000,
 
   /**
    * Error messages

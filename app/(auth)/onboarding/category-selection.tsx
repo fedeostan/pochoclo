@@ -50,6 +50,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import {
   Text,
   Button,
@@ -95,6 +96,12 @@ import {
  * - Fixed bottom button: Accessible for thumb, standard mobile UX
  */
 export default function CategorySelectionScreen() {
+  /**
+   * Translation Hooks
+   */
+  const { t } = useTranslation('onboarding');
+  const { t: tCommon } = useTranslation('common');
+
   /**
    * Redux Hooks
    *
@@ -220,7 +227,7 @@ export default function CategorySelectionScreen() {
 
     // Check if already in selection (case-insensitive via normalized ID)
     if (categories.includes(customCategoryId)) {
-      setCustomInputError('This category is already selected');
+      setCustomInputError(tCommon('validation.categoryAlreadySelected'));
       return;
     }
 
@@ -331,7 +338,7 @@ export default function CategorySelectionScreen() {
                 <View className="w-3 h-3 rounded-full border-2 border-border" />
               </View>
               <Text variant="small" className="text-muted-foreground text-center">
-                Step 1 of 2
+                {tCommon('step.stepOf', { current: 1, total: 2 })}
               </Text>
             </View>
 
@@ -342,10 +349,10 @@ export default function CategorySelectionScreen() {
              */}
             <View className="mb-8">
               <Text variant="h1" className="mb-2">
-                What do you want to learn about?
+                {t('categorySelection.title')}
               </Text>
               <Text variant="lead">
-                Select topics that interest you. You can always change this later.
+                {t('categorySelection.subtitle')}
               </Text>
             </View>
 
@@ -359,13 +366,13 @@ export default function CategorySelectionScreen() {
              */}
             <View className="mb-6">
               <Text variant="small" className="text-muted-foreground mb-3">
-                Popular Topics
+                {t('categorySelection.popularTopics')}
               </Text>
               <CategoryChipGroup>
                 {PREDEFINED_CATEGORIES.map((category) => (
                   <CategoryChip
                     key={category}
-                    label={CATEGORY_DISPLAY_NAMES[category]}
+                    label={t(`categories.${category}`)}
                     selected={selectedPredefined.includes(category)}
                     onPress={() => handleToggleCategory(category)}
                   />
@@ -382,7 +389,7 @@ export default function CategorySelectionScreen() {
             {customCategories.length > 0 && (
               <View className="mb-6">
                 <Text variant="small" className="text-muted-foreground mb-3">
-                  Your Topics
+                  {t('categorySelection.yourTopics')}
                 </Text>
                 <CategoryChipGroup>
                   {customCategories.map((category) => (
@@ -414,7 +421,7 @@ export default function CategorySelectionScreen() {
                  * Dashed border with plus icon indicates additive action.
                  */
                 <CategoryChip
-                  label="Add Custom Topic"
+                  label={t('categorySelection.addCustomTopic')}
                   isAddButton
                   onPress={handleShowCustomInput}
                 />
@@ -427,11 +434,11 @@ export default function CategorySelectionScreen() {
                  */
                 <View className="bg-card rounded-xl p-4 border-2 border-border">
                   <Text variant="small" className="text-foreground mb-2 font-medium">
-                    Add a custom topic
+                    {t('categorySelection.addCustomTitle')}
                   </Text>
                   <TextInput
                     className="bg-background rounded-lg px-4 py-3 text-foreground border border-border mb-2"
-                    placeholder="e.g., Blockchain, Machine Learning"
+                    placeholder={t('categorySelection.customPlaceholder')}
                     placeholderTextColor="#78716C"
                     value={customCategoryInput}
                     onChangeText={setCustomCategoryInput}
@@ -456,7 +463,7 @@ export default function CategorySelectionScreen() {
                       onPress={handleCancelCustomInput}
                       className="flex-1"
                     >
-                      Cancel
+                      {tCommon('button.cancel')}
                     </Button>
                     <Button
                       size="sm"
@@ -464,7 +471,7 @@ export default function CategorySelectionScreen() {
                       disabled={customCategoryInput.trim().length < 2}
                       className="flex-1"
                     >
-                      Add
+                      {tCommon('button.add')}
                     </Button>
                   </View>
                 </View>
@@ -486,8 +493,8 @@ export default function CategorySelectionScreen() {
             disabled={!isFormValid}
           >
             {selectedCount > 0
-              ? `Continue (${selectedCount} selected)`
-              : 'Select at least 1 topic'}
+              ? t('categorySelection.continueWithCount', { count: selectedCount })
+              : t('categorySelection.selectAtLeast')}
           </Button>
         </View>
       </KeyboardAvoidingView>

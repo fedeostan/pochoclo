@@ -59,6 +59,19 @@ export type { NavBarProps } from "./NavBar";
 export { BottomSheet } from "./BottomSheet";
 export type { BottomSheetProps, BottomSheetRef } from "./BottomSheet";
 
+// Modal version of BottomSheet - renders ABOVE all UI including tab bar
+// Use this when you need the sheet to cover the entire screen (focused interaction)
+export { BottomSheetModal } from "./BottomSheetModal";
+export type { BottomSheetModalProps, BottomSheetModalRef } from "./BottomSheetModal";
+
+// Full-screen modal - for forms and settings screens
+// Use this for profile sub-screens (change email, help, about, etc.)
+export { FullScreenModal } from "./FullScreenModal";
+export type { FullScreenModalProps, FullScreenModalRef } from "./FullScreenModal";
+
+export { TimePicker } from "./TimePicker";
+export type { TimePickerProps } from "./TimePicker";
+
 // Media & Avatars
 export { Avatar, getInitials } from "./Avatar";
 export type { AvatarProps, AvatarSize } from "./Avatar";

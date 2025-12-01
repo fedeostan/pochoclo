@@ -1,0 +1,115 @@
+{
+  "header": {
+    "memberSince": "Miembro desde {{date}}"
+  },
+  "sections": {
+    "myLearning": "Mi Aprendizaje",
+    "notifications": "Notificaciones",
+    "account": "Cuenta",
+    "support": "Soporte"
+  },
+  "status": {
+    "disabled": "Desactivado",
+    "enabled": "Activado",
+    "notSet": "No establecido",
+    "notConfigured": "No configurado",
+    "verified": "Verificado",
+    "notVerified": "No verificado"
+  },
+  "time": {
+    "minutesDay": "{{count}} minutos al día"
+  },
+  "settings": {
+    "learningPreferences": "Preferencias de aprendizaje",
+    "dailyReminder": "Recordatorio diario",
+    "reminderTime": "Hora del recordatorio",
+    "changeEmail": "Cambiar correo",
+    "changePassword": "Cambiar contraseña",
+    "emailVerified": "Correo verificado",
+    "helpFaq": "Ayuda y FAQ",
+    "sendFeedback": "Enviar comentarios",
+    "about": "Acerca de POCHOCLO",
+    "version": "Versión {{version}}"
+  },
+  "signOut": {
+    "button": "Cerrar sesión"
+  },
+  "imagePicker": {
+    "title": "Cambiar foto de perfil",
+    "takePhoto": "Tomar foto",
+    "chooseGallery": "Elegir de la galería",
+    "cancel": "Cancelar"
+  },
+  "timePicker": {
+    "title": "Establecer hora del recordatorio",
+    "save": "Guardar",
+    "cancel": "Cancelar"
+  },
+  "notifications": {
+    "permissionTitle": "Activar notificaciones",
+    "permissionMessage": "POCHOCLO te enviará un recordatorio diario para continuar tu aprendizaje. Puedes cambiar esto cuando quieras en Configuración.",
+    "permissionAllow": "Permitir",
+    "permissionNotNow": "Ahora no",
+    "settingsTitle": "Notificaciones desactivadas",
+    "settingsMessage": "Para activar las notificaciones, ve a Configuración de tu dispositivo y permite las notificaciones para POCHOCLO.",
+    "settingsButton": "Abrir Configuración",
+    "errorEnable": "No se pudieron activar las notificaciones. Por favor intenta de nuevo.",
+    "errorTime": "No se pudo actualizar la hora del recordatorio. Por favor intenta de nuevo."
+  },
+  "alerts": {
+    "uploadFailed": "Error al subir",
+    "cannotOpenEmail": "No se puede abrir el correo",
+    "emailFallback": "Por favor envía tus comentarios a feedback@pochoclo.app",
+    "errorTitle": "Error",
+    "errorOpenEmail": "No se pudo abrir el cliente de correo"
+  },
+  "editPreferences": {
+    "title": "Editar preferencias",
+    "categoriesSection": "Temas",
+    "timeSection": "Meta diaria",
+    "saveButton": "Guardar cambios"
+  },
+  "changeEmail": {
+    "title": "Cambiar correo",
+    "currentEmail": "Correo actual",
+    "newEmail": "Nuevo correo",
+    "newEmailPlaceholder": "Ingresa el nuevo correo",
+    "password": "Confirmar contraseña",
+    "passwordPlaceholder": "Ingresa tu contraseña actual",
+    "button": "Actualizar correo",
+    "success": "Correo actualizado exitosamente"
+  },
+  "changePassword": {
+    "title": "Cambiar contraseña",
+    "currentPassword": "Contraseña actual",
+    "currentPasswordPlaceholder": "Ingresa la contraseña actual",
+    "newPassword": "Nueva contraseña",
+    "newPasswordPlaceholder": "Ingresa la nueva contraseña",
+    "confirmPassword": "Confirmar nueva contraseña",
+    "confirmPasswordPlaceholder": "Confirma la nueva contraseña",
+    "button": "Actualizar contraseña",
+    "success": "Contraseña actualizada exitosamente"
+  },
+  "help": {
+    "title": "Ayuda y FAQ",
+    "searchPlaceholder": "Buscar temas de ayuda...",
+    "categories": {
+      "gettingStarted": "Primeros pasos",
+      "content": "Contenido y aprendizaje",
+      "account": "Cuenta y configuración",
+      "notifications": "Notificaciones",
+      "troubleshooting": "Solución de problemas"
+    }
+  },
+  "about": {
+    "title": "Acerca de POCHOCLO",
+    "description": "POCHOCLO es tu compañero de aprendizaje personal impulsado por IA. Entregamos contenido personalizado basado en tus intereses y tiempo disponible.",
+    "version": "Versión",
+    "madeWith": "Hecho con amor para aprendices de todo el mundo",
+    "links": {
+      "privacyPolicy": "Política de privacidad",
+      "termsOfService": "Términos de servicio",
+      "openSource": "Licencias de código abierto"
+    }
+  }
+}

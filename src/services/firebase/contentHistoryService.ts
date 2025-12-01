@@ -39,17 +39,19 @@ import {
   collection,
   doc,
   getDocs,
+  getDoc,
   addDoc,
   updateDoc,
   deleteDoc,
   query,
+  where,
   orderBy,
   limit,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '@/config/firebase';
-import { ContentHistoryEntry } from '@/types/content';
+import { ContentHistoryEntry, GeneratedContent } from '@/types/content';
 
 /**
  * COLLECTION PATHS
@@ -91,6 +93,19 @@ const getContentHistoryCollection = (userId: string) => {
  */
 const getContentHistoryDoc = (userId: string, historyId: string) => {
   return doc(db, 'users', userId, 'contentHistory', historyId);
+};
+
+/**
+ * Get the Firestore collection reference for a user's generated content
+ *
+ * @param userId - The Firebase Auth UID of the user
+ * @returns A collection reference to the user's generatedContent subcollection
+ *
+ * PATH: users/{userId}/generatedContent
+ * This is where n8n writes the AI-generated content.
+ */
+const getGeneratedContentCollection = (userId: string) => {
+  return collection(db, 'users', userId, 'generatedContent');
 };
 
 // =============================================================================
@@ -255,6 +270,10 @@ export async function getFullContentHistory(
           new Date().toISOString(),
         viewed: data.viewed || false,
         saved: data.saved || false,
+        // viewedAt is optional - only present after user marks as read
+        viewedAt: data.viewedAt
+          ? (data.viewedAt as Timestamp)?.toDate?.()?.toISOString()
+          : undefined,
       };
     });
 
@@ -288,6 +307,227 @@ export async function getFullContentHistory(
     }
 
     return [];
+  }
+}
+
+/**
+ * Find History Entry by Request ID
+ *
+ * Looks up a content history entry using the requestId.
+ * Returns the history document ID (historyId) needed for markContentViewed.
+ *
+ * @param userId - The Firebase Auth UID of the user
+ * @param requestId - The requestId of the content
+ * @returns Promise<string | null> - The historyId or null if not found
+ *
+ * WHY DO WE NEED THIS?
+ * The GeneratedContent type has requestId but not historyId.
+ * To call markContentViewed(), we need the Firestore document ID.
+ * This function bridges that gap by querying for the history entry.
+ *
+ * USAGE:
+ * ```typescript
+ * const historyId = await getHistoryIdByRequestId(userId, content.requestId);
+ * if (historyId) {
+ *   await markContentViewed(userId, historyId);
+ * }
+ * ```
+ */
+export async function getHistoryIdByRequestId(
+  userId: string,
+  requestId: string
+): Promise<string | null> {
+  try {
+    console.log('[ContentHistoryService] Looking up history by requestId:', requestId);
+
+    const historyCollection = getContentHistoryCollection(userId);
+
+    // Query for the entry with matching requestId
+    const historyQuery = query(
+      historyCollection,
+      where('requestId', '==', requestId),
+      limit(1)
+    );
+
+    const snapshot = await getDocs(historyQuery);
+
+    if (snapshot.empty) {
+      console.log('[ContentHistoryService] No history entry found for requestId:', requestId);
+      return null;
+    }
+
+    const historyId = snapshot.docs[0].id;
+    console.log('[ContentHistoryService] Found historyId:', historyId);
+    return historyId;
+  } catch (error) {
+    console.error('[ContentHistoryService] Error looking up history by requestId:', error);
+    return null;
+  }
+}
+
+/**
+ * Fetch Latest Generated Content
+ *
+ * Retrieves the most recent generated content for a user.
+ * Used to restore content when returning users open the app.
+ *
+ * @param userId - The Firebase Auth UID of the user
+ * @returns Promise<GeneratedContent | null> - The latest content or null if none exists
+ *
+ * WHY DO WE NEED THIS?
+ * When a returning user opens the app, we want to show their last generated
+ * content instead of auto-triggering new generation. This provides a better UX:
+ * - No unnecessary API calls to n8n
+ * - User can review their previous content
+ * - User decides when to generate new content via FAB button
+ *
+ * WHEN TO USE:
+ * - On HomeScreen mount for returning users
+ * - NOT for new users (they should auto-trigger generation)
+ *
+ * USAGE:
+ * ```typescript
+ * const latestContent = await getLatestGeneratedContent(userId);
+ * if (latestContent) {
+ *   dispatch(contentReceived(latestContent));
+ * } else {
+ *   // No content exists, show empty state or auto-trigger
+ * }
+ * ```
+ */
+export async function getLatestGeneratedContent(
+  userId: string
+): Promise<GeneratedContent | null> {
+  try {
+    console.log('[ContentHistoryService] Fetching latest content for user:', userId);
+
+    // Get reference to the user's generated content collection
+    const contentCollection = getGeneratedContentCollection(userId);
+
+    /**
+     * Build the Query
+     *
+     * We want the most recent completed content.
+     * - orderBy('generatedAt', 'desc') - Newest first
+     * - limit(1) - Only get the latest one
+     *
+     * NOTE: This fetches ALL documents and filters by timestamp.
+     * For a more efficient query, you could add a "latest" field
+     * or use a single document approach for current content.
+     */
+    const contentQuery = query(
+      contentCollection,
+      orderBy('generatedAt', 'desc'),
+      limit(1)
+    );
+
+    // Execute the query
+    const snapshot = await getDocs(contentQuery);
+
+    // No content found
+    if (snapshot.empty) {
+      console.log('[ContentHistoryService] No generated content found');
+      return null;
+    }
+
+    // Get the first (and only) document
+    const docData = snapshot.docs[0].data();
+
+    // Only return completed content
+    if (docData.status !== 'completed') {
+      console.log('[ContentHistoryService] Latest content not completed, status:', docData.status);
+      return null;
+    }
+
+    /**
+     * Convert Firestore Document to GeneratedContent
+     *
+     * Convert Timestamp to ISO string for Redux compatibility.
+     */
+    const content: GeneratedContent = {
+      requestId: docData.requestId,
+      status: docData.status,
+      content: docData.content,
+      topicSummary: docData.topicSummary,
+      generatedAt: docData.generatedAt?.toDate?.()?.toISOString?.() || null,
+      error: docData.error,
+    };
+
+    console.log('[ContentHistoryService] Latest content fetched:', content.requestId);
+
+    return content;
+  } catch (error) {
+    console.error('[ContentHistoryService] Error fetching latest content:', error);
+    return null;
+  }
+}
+
+// =============================================================================
+// STATISTICS OPERATIONS
+// =============================================================================
+
+/**
+ * Get Weekly Reading Count
+ *
+ * Returns the number of articles the user has ACTUALLY READ in the current week.
+ * Used for the MinimalStatsBar component to show "X this week".
+ *
+ * IMPORTANT CHANGE:
+ * Previously counted based on generatedAt (when AI created content).
+ * Now counts based on viewedAt (when user actually read/dismissed).
+ * This gives a more accurate representation of user engagement.
+ *
+ * @param userId - The Firebase Auth UID of the user
+ * @returns Promise<number> - Count of articles READ this week
+ *
+ * HOW IT WORKS:
+ * 1. Fetch recent history entries (up to 50)
+ * 2. Filter to only entries with viewed: true AND viewedAt timestamp
+ * 3. Count entries where viewedAt falls within current week (Sunday-Saturday)
+ *
+ * BACKWARDS COMPATIBILITY:
+ * For older entries without viewedAt, we fall back to checking viewed: true
+ * and use generatedAt as the date. This handles legacy data gracefully.
+ *
+ * USAGE:
+ * ```typescript
+ * const weeklyCount = await getWeeklyReadingCount(userId);
+ * // Returns: 3 (articles user actually read this week)
+ * ```
+ */
+export async function getWeeklyReadingCount(userId: string): Promise<number> {
+  try {
+    // Get recent history entries (more to ensure we capture full week)
+    const history = await getFullContentHistory(userId, 50);
+
+    // Calculate the start of the current week (Sunday at 00:00:00)
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay()); // Go to Sunday
+    startOfWeek.setHours(0, 0, 0, 0); // Start of day
+
+    // Count entries that were READ this week
+    // Must have viewed: true AND (viewedAt OR generatedAt) within this week
+    const weeklyCount = history.filter((entry) => {
+      // Only count entries that have been viewed
+      if (!entry.viewed) {
+        return false;
+      }
+
+      // Use viewedAt if available (new behavior), otherwise fall back to generatedAt (legacy)
+      // This ensures backwards compatibility with entries created before viewedAt was added
+      const readDate = entry.viewedAt
+        ? new Date(entry.viewedAt)
+        : new Date(entry.generatedAt);
+
+      return readDate >= startOfWeek;
+    }).length;
+
+    console.log('[ContentHistoryService] Weekly read count:', weeklyCount);
+    return weeklyCount;
+  } catch (error) {
+    console.error('[ContentHistoryService] Error getting weekly count:', error);
+    return 0;
   }
 }
 
@@ -430,8 +670,14 @@ export async function updateContentHistoryEntry(
 /**
  * Mark Content as Viewed
  *
- * Convenience function to mark a history entry as viewed.
- * This is a common operation, so we provide a dedicated function.
+ * Marks a history entry as viewed AND sets the viewedAt timestamp.
+ * This timestamp is used for calculating the weekly read count (streak).
+ *
+ * WHY SET viewedAt HERE?
+ * - viewedAt tracks WHEN the user actually read the content
+ * - This is different from generatedAt (when AI created it)
+ * - Weekly count uses viewedAt to count reading activity per week
+ * - Using serverTimestamp ensures consistent, accurate timestamps
  *
  * @param userId - The Firebase Auth UID of the user
  * @param historyId - The document ID of the entry
@@ -441,7 +687,25 @@ export async function markContentViewed(
   userId: string,
   historyId: string
 ): Promise<void> {
-  return updateContentHistoryEntry(userId, historyId, { viewed: true });
+  try {
+    console.log('[ContentHistoryService] Marking content as viewed:', historyId);
+
+    const docRef = getContentHistoryDoc(userId, historyId);
+
+    // Set both viewed flag AND viewedAt timestamp
+    // viewedAt is used for weekly count calculation
+    await updateDoc(docRef, {
+      viewed: true,
+      viewedAt: serverTimestamp(),
+    });
+
+    console.log('[ContentHistoryService] Content marked as viewed with timestamp');
+  } catch (error) {
+    console.error('[ContentHistoryService] Error marking content viewed:', error);
+    throw new Error(
+      `Failed to mark content as viewed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
 }
 
 /**

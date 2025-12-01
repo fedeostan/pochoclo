@@ -211,6 +211,17 @@ export interface ContentHistoryEntry {
   generatedAt: string;
   viewed: boolean;
   saved: boolean;
+  /**
+   * ISO 8601 string representing when the user actually read the content.
+   * This is set when the user marks content as viewed (dismisses after reading).
+   * Used for calculating weekly read count (streak).
+   *
+   * WHY SEPARATE FROM generatedAt?
+   * - generatedAt: When AI created the content
+   * - viewedAt: When user actually read/dismissed it
+   * The weekly count should track reading activity, not generation time.
+   */
+  viewedAt?: string;
 }
 
 /**
@@ -261,6 +272,60 @@ export interface ContentState {
    * We use string instead of Date because Redux requires serializable values.
    */
   lastFetchedAt: string | null;
+}
+
+/**
+ * =============================================================================
+ * RECENT ARTICLES TYPES
+ * =============================================================================
+ *
+ * These types support the "Recent Articles" widget on the home screen.
+ * Recent articles are the last 3 articles the user has engaged with.
+ */
+
+/**
+ * RecentArticle Interface
+ *
+ * Represents an article in the user's recent reading history.
+ * Stored at: users/{userId}/recentArticles/{docId}
+ *
+ * PURPOSE:
+ * - Provides quick access to recently read content
+ * - Shows a compact preview on the home screen
+ * - Maximum 3 articles stored (oldest deleted when new one added)
+ *
+ * FIELDS:
+ * - id: Firestore document ID (added after fetch)
+ * - contentBody: Full article content (denormalized for fast reads)
+ * - readAt: When the user finished reading this article
+ * - createdAt: When this recent article entry was created
+ *
+ * WHY STORE FULL CONTENT?
+ * Unlike a reference-based approach, we store the full ContentBody because:
+ * 1. Articles are AI-generated on-the-fly, not stored in a master collection
+ * 2. 3 articles is trivially small (~10-15KB total)
+ * 3. Single read = complete data, no additional queries needed
+ * 4. Content persists even if the original generated content is deleted
+ *
+ * WIDGET DISPLAY:
+ * On the home screen, this displays as:
+ * - Title (from contentBody.title)
+ * - One line preview (from contentBody.summary, truncated)
+ * Tapping opens the full ContentFullView with complete article.
+ */
+export interface RecentArticle {
+  id?: string;
+  contentBody: ContentBody;
+  /**
+   * ISO 8601 string representing when the user finished reading.
+   * This determines the order in the "Recent" list (newest first).
+   */
+  readAt: string;
+  /**
+   * ISO 8601 string representing when this entry was created.
+   * Usually same as readAt, but kept separate for clarity.
+   */
+  createdAt: string;
 }
 
 /**

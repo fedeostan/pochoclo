@@ -1,64 +1,74 @@
 /**
  * Profile Screen - User Account Tab
  *
- * This screen displays the user's profile information and account settings.
- * It's the central hub for user-related actions like viewing account details,
- * managing settings, and signing out.
+ * This screen is the central hub for user-related settings and account management.
+ * It follows mobile UX best practices with a clear information hierarchy:
  *
- * PURPOSE:
- * The Profile screen is where users:
- * - View their account information
- * - Upload/change their profile photo
- * - Access account settings
- * - Sign out of the app
+ * 1. IDENTITY (Profile Header) - Who am I?
+ * 2. PERSONALIZATION (My Learning) - How do I customize my experience?
+ * 3. NOTIFICATIONS - How do I stay engaged?
+ * 4. ACCOUNT - How do I manage my account?
+ * 5. SUPPORT - Help when I need it
+ * 6. SIGN OUT - Destructive action at bottom
  *
- * FIREBASE USER DATA DISPLAYED:
- * The SerializableUser type (from authSlice.ts) contains:
- * - uid: Unique user identifier (always present)
- * - email: User's email address (string | null)
- * - displayName: User's display name (string | null)
- * - photoURL: Profile photo URL (string | null)
- * - emailVerified: Whether email is verified (boolean)
+ * DESIGN PRINCIPLES:
+ * - Grouped list pattern: Settings organized into logical sections
+ * - Clear visual hierarchy: Important items first
+ * - Consistent interactions: Navigation items show chevrons, toggles show switches
+ * - Accessibility: Touch targets meet 44pt minimum, proper labels
  *
- * PROFILE IMAGE FEATURE (PHASE 6):
- * This screen integrates the profile image upload feature:
- * - Avatar component displays current profile photo or initials
- * - Tapping avatar opens ImagePickerSheet bottom sheet
- * - User can choose camera or gallery
- * - Images are uploaded to Firebase Storage via Redux thunks
- * - Loading and error states provide user feedback
- *
- * DESIGN SYSTEM:
- * Follows UI_RULES.md principles:
- * - Minimal: Clean layout with purposeful whitespace
- * - Light: Off-white background (#FAFAF9)
- * - Soft: Muted colors, no harsh tones
- * - Modern: Rounded corners, clean typography
+ * WHAT WAS REMOVED (from previous version):
+ * - Firebase UID display (internal technical data)
+ * - Duplicate email/name in Account Details card
+ * - "Coming Soon" placeholder
+ * These were removed because users don't need to see technical data.
  */
 
-import { useRef, useEffect } from 'react';
-import { View, ScrollView, Alert, Pressable } from 'react-native';
+import { useRef, useEffect, useState } from 'react';
+import { View, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { CircleUser, Mail, Shield, Key, CheckCircle, XCircle, Settings, LogOut, BookOpen, Clock, ChevronRight } from 'lucide-react-native';
-
-// UI Components - Import Avatar and getInitials for profile photo display
+import * as Linking from 'expo-linking';
+import { useTranslation } from 'react-i18next';
 import {
-  Text,
-  Button,
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  Avatar,
-  getInitials,
-  CategoryChip,
-  CategoryChipGroup,
-} from '@/components/ui';
-import type { BottomSheetRef } from '@/components/ui/BottomSheet';
+  BookOpen,
+  Bell,
+  Clock, // For reminder time row
+  Mail,
+  Lock,
+  CheckCircle,
+  HelpCircle,
+  MessageSquare,
+  Info,
+  LogOut,
+} from 'lucide-react-native';
 
-// Preferences helpers - For displaying category and time names
+// UI Components
+import { Text, Button, TimePicker } from '@/components/ui';
+// Use BottomSheetModalRef because ImagePickerSheet now uses BottomSheetModal
+import type { BottomSheetModalRef } from '@/components/ui/BottomSheetModal';
+
+// Profile-specific components
+import {
+  ProfileHeader,
+  SettingsSection,
+  SettingsItem,
+  // Modal components for profile sub-screens
+  ChangeEmailModal,
+  ChangePasswordModal,
+  EditPreferencesModal,
+  HelpModal,
+  AboutModal,
+} from '@/components/profile';
+import type {
+  ChangeEmailModalRef,
+  ChangePasswordModalRef,
+  EditPreferencesModalRef,
+  HelpModalRef,
+  AboutModalRef,
+} from '@/components/profile';
+
+// Preferences helpers
 import {
   getCategoryDisplayName,
   PREDEFINED_TIME_OPTIONS,
@@ -75,741 +85,939 @@ import { useAppDispatch, useAppSelector } from '@/store';
 import {
   signOut,
   updateUserProfileImage,
-  removeUserProfileImage,
   clearProfileImageError,
 } from '@/store/slices/authSlice';
+
+// Notification Redux actions
+// These actions update the notification state in Redux
+import {
+  setNotificationEnabled,
+  setNotificationTime,
+  setNotificationPermissionStatus,
+  saveNotificationPreferencesAsync,
+} from '@/store/slices/userPreferencesSlice';
+
+// Notification service functions
+// These handle the actual Expo notification operations
+import {
+  requestNotificationPermission,
+  scheduleDailyNotification,
+  cancelDailyNotification,
+  getNotificationPermissionStatus,
+} from '@/services/notificationService';
+
+// Default notification preferences for fallback values
+import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types/preferences';
 
 // Theme colors for icons
 import { colors } from '@/theme';
 
+// App version - we'll get this from app config
+import Constants from 'expo-constants';
+
+/**
+ * Get the app version string
+ * Falls back to '1.0.0' if not available
+ */
+function getAppVersion(): string {
+  return Constants.expoConfig?.version || '1.0.0';
+}
+
 /**
  * ProfileScreen Component
  *
- * Displays user profile information from Firebase Auth
- * and provides account management functionality including
- * profile image upload and management.
- *
- * STATE MANAGEMENT:
- * - Reads user data from Redux store (state.auth.user)
- * - Reads profileImageLoading for upload progress
- * - Reads profileImageError for upload failures
- * - Dispatches signOut, updateUserProfileImage, removeUserProfileImage
- *
- * PROFILE IMAGE FLOW:
- * 1. User taps avatar → ImagePickerSheet opens
- * 2. User selects camera or gallery
- * 3. useImagePicker handles permissions and image selection
- * 4. Redux thunk uploads to Firebase Storage
- * 5. Avatar updates with new image
- *
- * @returns The profile screen component
+ * The main profile screen with organized settings sections.
  */
 export default function ProfileScreen() {
+  // ==========================================================================
+  // TRANSLATION
+  // ==========================================================================
+
   /**
-   * Redux Hooks
+   * Translation Hook
    *
-   * useAppDispatch: Returns typed dispatch function for actions
-   * useAppSelector: Reads from Redux store with TypeScript support
-   *
-   * We read:
-   * - user: The current authenticated user (SerializableUser)
-   * - loading: Whether an auth operation is in progress
-   * - profileImageLoading: Whether a profile image operation is in progress
-   * - profileImageError: Error message from failed image operations
+   * useTranslation('profile') loads translations from the 'profile' namespace.
+   * We also use 'common' for shared button text and error messages.
    */
+  const { t } = useTranslation('profile');
+  const { t: tCommon } = useTranslation('common');
+
+  // ==========================================================================
+  // REDUX STATE
+  // ==========================================================================
+
   const dispatch = useAppDispatch();
+
+  // Auth state: user info and loading states
   const { user, loading, profileImageLoading, profileImageError } = useAppSelector(
     (state) => state.auth
   );
 
-  /**
-   * User Preferences State
-   *
-   * We read the user's learning preferences from Redux:
-   * - categories: Array of selected category IDs
-   * - dailyLearningMinutes: Number of minutes per day
-   * - onboardingCompleted: Whether user finished onboarding
-   *
-   * This data is used to display the "Learning Preferences" section.
-   */
-  const { categories, dailyLearningMinutes, onboardingCompleted } = useAppSelector(
-    (state) => state.userPreferences
-  );
+  // User preferences: categories, daily learning time, and notifications
+  // We destructure notifications separately for clearer access
+  const {
+    categories,
+    dailyLearningMinutes,
+    onboardingCompleted,
+    notifications, // Notification preferences from Redux
+  } = useAppSelector((state) => state.userPreferences);
+
+  // ==========================================================================
+  // LOCAL STATE
+  // ==========================================================================
 
   /**
-   * Ref for ImagePickerSheet
+   * Controls visibility of the TimePicker modal
    *
-   * We use a ref to control the bottom sheet imperatively:
-   * - expand() to open the sheet
-   * - close() to close the sheet
-   *
-   * WHY A REF INSTEAD OF STATE?
-   * Bottom sheets from @gorhom/bottom-sheet are optimized for
-   * imperative control. Using state would cause unnecessary re-renders.
+   * This is local UI state - it only matters for showing/hiding the picker.
+   * The actual time value comes from Redux (notifications.time).
    */
-  const imagePickerSheetRef = useRef<BottomSheetRef>(null);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
-  /**
-   * Image Picker Hook
-   *
-   * This hook provides:
-   * - takePhoto(): Launch camera and capture photo
-   * - pickFromGallery(): Open photo library picker
-   * - isLoading: Whether an image operation is in progress
-   *
-   * The hook handles:
-   * - Permission requests with user-friendly messages
-   * - Image optimization (resizing, compression)
-   * - Error handling
-   */
+  // ==========================================================================
+  // REFS
+  // ==========================================================================
+
+  // Ref for controlling the image picker bottom sheet modal
+  // IMPORTANT: Uses BottomSheetModalRef (not BottomSheetRef) because
+  // ImagePickerSheet now uses BottomSheetModal for proper z-index
+  const imagePickerSheetRef = useRef<BottomSheetModalRef>(null);
+
+  // Refs for profile sub-screen modals
+  // These modals replace navigation to separate screens
+  // Using modals ensures pressing "back" always returns to Profile
+  const changeEmailModalRef = useRef<ChangeEmailModalRef>(null);
+  const changePasswordModalRef = useRef<ChangePasswordModalRef>(null);
+  const editPreferencesModalRef = useRef<EditPreferencesModalRef>(null);
+  const helpModalRef = useRef<HelpModalRef>(null);
+  const aboutModalRef = useRef<AboutModalRef>(null);
+
+  // ==========================================================================
+  // HOOKS
+  // ==========================================================================
+
+  // Image picker hook for avatar changes
   const { takePhoto, pickFromGallery, isLoading: isImagePickerLoading } = useImagePicker();
 
+  // Combined loading state for avatar
+  const isLoadingImage = isImagePickerLoading || profileImageLoading;
+
+  // ==========================================================================
+  // EFFECTS
+  // ==========================================================================
+
   /**
-   * Effect: Show Error Alert When Profile Image Upload Fails
+   * Check notification permission status on mount
    *
-   * We use an effect to watch profileImageError and show an alert
-   * when an error occurs. After showing the alert, we clear the error.
+   * WHY CHECK ON MOUNT?
+   * - User might have changed permissions in system settings
+   * - We need to know current status to show correct UI
+   * - Permission is device-specific, not stored in Firestore
    *
-   * WHY AN EFFECT?
-   * - The error comes from Redux (async thunk rejection)
-   * - We want to show a user-friendly alert
-   * - The effect ensures we only show the alert once per error
+   * This effect runs once when the profile screen loads and syncs
+   * the current OS permission status with our Redux state.
+   */
+  useEffect(() => {
+    const checkPermissionStatus = async () => {
+      // Get the current permission status from the OS
+      const status = await getNotificationPermissionStatus();
+
+      // Update Redux with the current status
+      // This ensures our UI reflects reality (e.g., if user disabled in Settings)
+      dispatch(setNotificationPermissionStatus(status));
+    };
+
+    checkPermissionStatus();
+  }, [dispatch]);
+
+  /**
+   * Show error alert when profile image upload fails
    */
   useEffect(() => {
     if (profileImageError) {
       Alert.alert(
-        'Upload Failed',
+        t('alerts.uploadFailed'),
         profileImageError,
         [
           {
-            text: 'OK',
+            text: tCommon('button.ok'),
             onPress: () => dispatch(clearProfileImageError()),
           },
         ]
       );
     }
-  }, [profileImageError, dispatch]);
+  }, [profileImageError, dispatch, t, tCommon]);
+
+  // ==========================================================================
+  // HANDLERS
+  // ==========================================================================
 
   /**
-   * Handle Avatar Press
+   * Open the image picker modal when avatar is tapped
    *
-   * Opens the ImagePickerSheet when user taps on their avatar.
-   * The sheet provides options to choose from gallery or take a photo.
+   * IMPORTANT: Use present() not expand() for BottomSheetModal!
+   * - expand(): Used by regular BottomSheet
+   * - present(): Used by BottomSheetModal (adds to portal, then animates)
    */
   const handleAvatarPress = () => {
-    imagePickerSheetRef.current?.expand();
+    imagePickerSheetRef.current?.present();
   };
 
   /**
-   * Handle Gallery Selection
+   * Handle gallery selection for avatar
    *
-   * Called when user selects "Choose from Library" in the sheet.
-   *
-   * FLOW:
-   * 1. Close the sheet
-   * 2. Open photo library picker
-   * 3. If image selected, dispatch upload thunk
-   * 4. Redux handles loading state and errors
+   * IMPORTANT: Use dismiss() not close() for BottomSheetModal!
    */
   const handleSelectGallery = async () => {
-    // Close the sheet first for better UX
-    imagePickerSheetRef.current?.close();
-
-    // Pick an image from the gallery
+    imagePickerSheetRef.current?.dismiss();
     const result = await pickFromGallery();
-
-    // If user selected an image (not cancelled), upload it
     if (result.success) {
       dispatch(updateUserProfileImage({ imageUri: result.uri }));
     }
-    // If cancelled or error, the hook already handles it
   };
 
   /**
-   * Handle Camera Selection
+   * Handle camera selection for avatar
    *
-   * Called when user selects "Take Photo" in the sheet.
-   *
-   * FLOW:
-   * 1. Close the sheet
-   * 2. Open camera
-   * 3. If photo captured, dispatch upload thunk
-   * 4. Redux handles loading state and errors
+   * IMPORTANT: Use dismiss() not close() for BottomSheetModal!
    */
   const handleSelectCamera = async () => {
-    // Close the sheet first
-    imagePickerSheetRef.current?.close();
-
-    // Take a photo with the camera
+    imagePickerSheetRef.current?.dismiss();
     const result = await takePhoto();
-
-    // If photo was taken (not cancelled), upload it
     if (result.success) {
       dispatch(updateUserProfileImage({ imageUri: result.uri }));
     }
   };
 
   /**
-   * Handle Sheet Close
-   *
-   * Called when the sheet is dismissed (via backdrop tap or swipe).
-   * Currently just for cleanup, but could be used for analytics, etc.
+   * Handle image picker sheet close
    */
   const handleSheetClose = () => {
-    // Optional: Add any cleanup logic here
+    // Optional cleanup
   };
 
   /**
-   * Sign Out Handler
+   * Open the Edit Preferences modal
    *
-   * Dispatches the signOut async thunk to:
-   * 1. Call Firebase signOut()
-   * 2. Clear tokens from AsyncStorage
-   * 3. Update Redux state (user = null)
-   * 4. Navigate to /welcome explicitly
+   * MODAL APPROACH:
+   * Instead of navigating to a separate screen, we present a full-screen
+   * bottom sheet modal. This solves the back navigation issue because:
+   * - Modals don't affect the navigation stack
+   * - Dismissing always returns to exactly where we were (Profile)
+   * - Better UX: modal slides up, making the action feel contained
+   */
+  const handleEditPreferences = () => {
+    editPreferencesModalRef.current?.present();
+  };
+
+  /**
+   * Toggle daily reminder notifications on/off
    *
-   * WHY EXPLICIT NAVIGATION?
-   * The Redirect component in index.tsx only evaluates on initial render.
-   * It doesn't re-trigger when Redux state changes mid-session.
-   * So we explicitly navigate after successful sign-out.
+   * This is the main handler for the notification toggle switch.
+   * It handles both enabling and disabling notifications.
+   *
+   * ENABLING FLOW:
+   * 1. Check current permission status
+   * 2. If undetermined, request permission (shows pre-permission alert)
+   * 3. If denied, show message directing to Settings
+   * 4. If granted, schedule the notification
+   * 5. Update Redux state
+   * 6. Persist to Firestore
+   *
+   * DISABLING FLOW:
+   * 1. Cancel any scheduled notification
+   * 2. Update Redux state
+   * 3. Persist to Firestore
+   *
+   * @param enabled - Whether user wants notifications enabled
+   */
+  const handleToggleReminder = async (enabled: boolean) => {
+    // Get the current notification time (use default if not set)
+    const notificationTime = notifications.time ?? DEFAULT_NOTIFICATION_PREFERENCES.time ?? '09:00';
+
+    if (enabled) {
+      // -----------------------------------------------------------------------
+      // ENABLING NOTIFICATIONS
+      // -----------------------------------------------------------------------
+
+      try {
+        // Step 1: Request permission (handles all permission states internally)
+        // This function:
+        // - Returns true immediately if already granted
+        // - Shows pre-permission alert if undetermined, then requests
+        // - Shows "go to Settings" alert if previously denied
+        const granted = await requestNotificationPermission();
+
+        // Update permission status in Redux
+        const newStatus = await getNotificationPermissionStatus();
+        dispatch(setNotificationPermissionStatus(newStatus));
+
+        if (!granted) {
+          // Permission not granted - don't enable notifications
+          // The requestNotificationPermission function already showed an appropriate alert
+          console.log('[Profile] Notification permission not granted');
+          return;
+        }
+
+        // Step 2: Permission granted - schedule the notification
+        await scheduleDailyNotification(notificationTime);
+
+        // Step 3: Update Redux state (optimistically)
+        dispatch(setNotificationEnabled(true));
+
+        // Step 4: Persist to Firestore
+        if (user?.uid) {
+          dispatch(saveNotificationPreferencesAsync({
+            userId: user.uid,
+            notifications: {
+              enabled: true,
+              time: notificationTime,
+            },
+          }));
+        }
+
+        console.log('[Profile] Notifications enabled at', notificationTime);
+
+      } catch (error) {
+        // Handle any errors during the enable process
+        console.error('[Profile] Error enabling notifications:', error);
+        Alert.alert(
+          t('alerts.errorTitle'),
+          t('notifications.errorEnable'),
+          [{ text: tCommon('button.ok') }]
+        );
+      }
+    } else {
+      // -----------------------------------------------------------------------
+      // DISABLING NOTIFICATIONS
+      // -----------------------------------------------------------------------
+
+      try {
+        // Step 1: Cancel any scheduled notification
+        await cancelDailyNotification();
+
+        // Step 2: Update Redux state
+        dispatch(setNotificationEnabled(false));
+
+        // Step 3: Persist to Firestore (keep the time for when user re-enables)
+        if (user?.uid) {
+          dispatch(saveNotificationPreferencesAsync({
+            userId: user.uid,
+            notifications: {
+              enabled: false,
+              time: notificationTime, // Preserve time preference
+            },
+          }));
+        }
+
+        console.log('[Profile] Notifications disabled');
+
+      } catch (error) {
+        console.error('[Profile] Error disabling notifications:', error);
+        // Still update UI even if cancel failed (notification might not have existed)
+        dispatch(setNotificationEnabled(false));
+      }
+    }
+  };
+
+  /**
+   * Handle tapping on the notification time
+   *
+   * Opens the TimePicker modal so user can change when they receive reminders.
+   * Only opens if notifications are enabled (otherwise time is irrelevant).
+   */
+  const handleTimePress = () => {
+    // Only allow changing time if notifications are enabled
+    if (notifications.enabled) {
+      setShowTimePicker(true);
+    }
+  };
+
+  /**
+   * Handle saving a new notification time
+   *
+   * Called when user confirms their time selection in the TimePicker.
+   *
+   * FLOW:
+   * 1. Close the picker
+   * 2. Update Redux state with new time
+   * 3. Reschedule the notification at the new time
+   * 4. Persist to Firestore
+   *
+   * @param newTime - The selected time in "HH:MM" format
+   */
+  const handleTimeSave = async (newTime: string) => {
+    // Close the picker first for responsive UI
+    setShowTimePicker(false);
+
+    try {
+      // Update Redux state immediately (optimistic update)
+      dispatch(setNotificationTime(newTime));
+
+      // Reschedule the notification at the new time
+      // This cancels the old one and schedules a new one
+      if (notifications.enabled) {
+        await scheduleDailyNotification(newTime);
+      }
+
+      // Persist to Firestore
+      if (user?.uid) {
+        dispatch(saveNotificationPreferencesAsync({
+          userId: user.uid,
+          notifications: {
+            enabled: notifications.enabled,
+            time: newTime,
+          },
+        }));
+      }
+
+      console.log('[Profile] Notification time updated to', newTime);
+
+    } catch (error) {
+      console.error('[Profile] Error updating notification time:', error);
+      Alert.alert(
+        t('alerts.errorTitle'),
+        t('notifications.errorTime'),
+        [{ text: tCommon('button.ok') }]
+      );
+    }
+  };
+
+  /**
+   * Handle canceling the TimePicker
+   *
+   * Just closes the picker without making any changes.
+   */
+  const handleTimeCancel = () => {
+    setShowTimePicker(false);
+  };
+
+  /**
+   * Open the Change Email modal
+   *
+   * Presents a full-screen modal for email change form.
+   * Using modal instead of navigation ensures proper back behavior.
+   */
+  const handleChangeEmail = () => {
+    changeEmailModalRef.current?.present();
+  };
+
+  /**
+   * Open the Change Password modal
+   *
+   * Presents a full-screen modal for password change form.
+   * Using modal instead of navigation ensures proper back behavior.
+   */
+  const handleChangePassword = () => {
+    changePasswordModalRef.current?.present();
+  };
+
+  /**
+   * Open the Help & FAQ modal
+   *
+   * Presents a full-screen modal with FAQ content.
+   * Using modal instead of navigation ensures proper back behavior.
+   */
+  const handleHelp = () => {
+    helpModalRef.current?.present();
+  };
+
+  /**
+   * Open email client for feedback
+   */
+  const handleSendFeedback = async () => {
+    const email = 'feedback@pochoclo.app';
+    const subject = encodeURIComponent('POCHOCLO App Feedback');
+    const mailtoUrl = `mailto:${email}?subject=${subject}`;
+
+    try {
+      const canOpen = await Linking.canOpenURL(mailtoUrl);
+      if (canOpen) {
+        await Linking.openURL(mailtoUrl);
+      } else {
+        Alert.alert(
+          t('alerts.cannotOpenEmail'),
+          t('alerts.emailFallback')
+        );
+      }
+    } catch {
+      Alert.alert(
+        t('alerts.errorTitle'),
+        t('alerts.errorOpenEmail')
+      );
+    }
+  };
+
+  /**
+   * Open the About modal
+   *
+   * Presents a full-screen modal with app information.
+   * Using modal instead of navigation ensures proper back behavior.
+   */
+  const handleAbout = () => {
+    aboutModalRef.current?.present();
+  };
+
+  /**
+   * Sign out the user
    */
   const handleSignOut = async () => {
     try {
       await dispatch(signOut()).unwrap();
-      // Success! Navigate to welcome screen
       router.replace('/welcome');
     } catch {
-      // Error is already set in Redux state
-      // Sign out rarely fails, but if it does, user can try again
+      // Error handled in Redux
     }
   };
 
-  /**
-   * Computed: Is Loading Image
-   *
-   * True if either the image picker is working (selecting/optimizing)
-   * or Redux is uploading to Firebase Storage.
-   *
-   * We combine both states because from the user's perspective,
-   * it's one continuous "loading" experience.
-   */
-  const isLoadingImage = isImagePickerLoading || profileImageLoading;
+  // ==========================================================================
+  // COMPUTED VALUES
+  // ==========================================================================
 
   /**
-   * Helper: Get Time Display Label
+   * Convert 24-hour time string to 12-hour display format
    *
-   * Converts the stored minutes value to a user-friendly display string.
-   * First checks predefined options for a matching label, otherwise
-   * formats as "X minutes a day".
+   * Takes a time in "HH:MM" format and returns a human-readable string
+   * like "9:00 AM" or "2:30 PM".
    *
-   * @param minutes - The stored dailyLearningMinutes value
-   * @returns A display-friendly string like "15 minutes a day"
+   * WHY THIS CONVERSION?
+   * - We store time in 24-hour format for simplicity and unambiguity
+   * - But users prefer reading time in 12-hour format with AM/PM
+   * - This bridges the gap between storage and display
+   *
+   * @param time24 - Time in "HH:MM" 24-hour format (e.g., "09:00", "14:30")
+   * @returns Time in 12-hour format with AM/PM (e.g., "9:00 AM", "2:30 PM")
+   *
+   * EXAMPLES:
+   * formatTimeForDisplay("09:00") => "9:00 AM"
+   * formatTimeForDisplay("14:30") => "2:30 PM"
+   * formatTimeForDisplay("00:00") => "12:00 AM" (midnight)
+   * formatTimeForDisplay("12:00") => "12:00 PM" (noon)
+   */
+  const formatTimeForDisplay = (time24: string): string => {
+    // Split the time string and convert to numbers
+    const [hoursStr, minutesStr] = time24.split(':');
+    const hours = parseInt(hoursStr, 10);
+    const minutes = parseInt(minutesStr, 10);
+
+    // Determine AM or PM based on hour
+    // Hours 0-11 are AM, hours 12-23 are PM
+    const period = hours >= 12 ? 'PM' : 'AM';
+
+    // Convert 24-hour to 12-hour format
+    // - 0 becomes 12 (midnight)
+    // - 13-23 become 1-11 (afternoon/evening)
+    // - 1-11 stay the same (morning)
+    // - 12 stays 12 (noon)
+    const hours12 = hours % 12 || 12;
+
+    // Format minutes with leading zero (padStart ensures "05" not "5")
+    const minutesFormatted = minutes.toString().padStart(2, '0');
+
+    return `${hours12}:${minutesFormatted} ${period}`;
+  };
+
+  /**
+   * Get the subtitle text for the notifications setting item
+   *
+   * Shows the formatted time when enabled, or "Disabled" when off.
+   * The time is tappable when enabled to allow changing it.
+   *
+   * @returns Display string for notification subtitle
+   */
+  const getNotificationSubtitle = (): string => {
+    if (!notifications.enabled) {
+      return t('status.disabled');
+    }
+
+    // Get the time, falling back to default if not set
+    const time = notifications.time ?? DEFAULT_NOTIFICATION_PREFERENCES.time ?? '09:00';
+    return formatTimeForDisplay(time);
+  };
+
+  /**
+   * Get display label for daily learning time
    */
   const getTimeDisplayLabel = (minutes: number | null): string => {
-    if (minutes === null) return 'Not set';
+    if (minutes === null) return t('status.notSet');
 
-    // Check if it matches a predefined option
     const predefined = PREDEFINED_TIME_OPTIONS.find(opt => opt.minutes === minutes);
     if (predefined) {
       return predefined.label;
     }
 
-    // Custom time: format as "X minutes a day"
-    return `${minutes} minutes a day`;
+    return t('time.minutesDay', { count: minutes });
   };
 
   /**
-   * Handle Edit Preferences
-   *
-   * Navigates to the edit preferences screen.
-   * Uses push so user can go back to profile.
+   * Build subtitle for Learning Preferences item
+   * Shows first 2-3 categories + time
    */
-  const handleEditPreferences = () => {
-    router.push('/edit-preferences');
+  const getLearningPreferencesSubtitle = (): string => {
+    if (!onboardingCompleted) return t('status.notConfigured');
+
+    const categoryNames = categories
+      .slice(0, 2)
+      .map(cat => getCategoryDisplayName(cat));
+
+    const categoryText = categories.length > 2
+      ? `${categoryNames.join(', ')} +${categories.length - 2}`
+      : categoryNames.join(', ');
+
+    const timeText = getTimeDisplayLabel(dailyLearningMinutes);
+
+    return `${categoryText} • ${timeText}`;
   };
+
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-      {/**
-       * ScrollView Container
-       *
-       * Profile screens can have lots of settings and options.
-       * ScrollView ensures all content is accessible.
-       */}
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-1 px-6 py-8">
-          {/**
-           * Header Section
-           *
-           * Shows "Profile" title and subtitle.
-           * Consistent with other tab screens.
-           */}
-          <View className="mb-8">
-            <Text variant="h1" className="mb-2">
-              Profile
-            </Text>
-            <Text variant="lead" className="text-muted-foreground">
-              Manage your account
-            </Text>
-          </View>
+        <View className="flex-1 px-4 py-6">
+          {/* ================================================================
+              PROFILE HEADER
+              Shows avatar, name, email, and member since date
+              ================================================================ */}
+          <ProfileHeader
+            user={user}
+            onAvatarPress={handleAvatarPress}
+            isLoadingImage={isLoadingImage}
+          />
 
-          {/**
-           * Profile Avatar Card
-           *
-           * Shows user avatar with profile photo or initials fallback.
-           * Tapping the avatar opens the image picker sheet.
-           *
-           * AVATAR FEATURES:
-           * - Displays photoURL if available, otherwise initials
-           * - Edit indicator (+ icon) shows it's tappable
-           * - Loading overlay during image upload
-           * - Accessible with proper role and label
-           */}
-          <Card className="mb-6">
-            <CardContent className="items-center py-8">
-              {/**
-               * Avatar Component
-               *
-               * The Avatar component from our UI library handles:
-               * - Displaying the image from photoURL
-               * - Fallback to initials when no image
-               * - Loading state during image fetch
-               * - Edit indicator badge
-               *
-               * Props explained:
-               * - imageUri: The Firebase Storage download URL
-               * - initials: Fallback text (uses getInitials helper)
-               * - size="xl": Large size for profile page (96px)
-               * - showEditIndicator: Shows + badge indicating tappable
-               * - isLoading: Shows spinner during upload
-               * - onPress: Opens the image picker sheet
-               * - className: Additional margin below
-               */}
-              <Avatar
-                imageUri={user?.photoURL}
-                initials={getInitials(user?.displayName || user?.email)}
-                size="xl"
-                showEditIndicator
-                isLoading={isLoadingImage}
-                onPress={handleAvatarPress}
-                className="mb-4"
-              />
-              <Text variant="h3" className="mb-1">
-                {user?.displayName || 'User'}
-              </Text>
-              <Text variant="muted">
-                {user?.email || 'No email'}
-              </Text>
-            </CardContent>
-          </Card>
-
-          {/**
-           * Account Details Card
-           *
-           * Displays all available Firebase Auth user data.
-           * Each row shows a label, icon, and value.
-           */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Account Details</CardTitle>
-              <CardDescription>
-                Information from Firebase Authentication
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="gap-4">
-              {/**
-               * User ID Row
-               * The uid is always present and unique.
-               */}
-              <DataRow
-                icon={<Key size={20} color={colors.mutedForeground} />}
-                label="User ID"
-                value={user?.uid || 'N/A'}
-                isMonospace
-              />
-
-              {/**
-               * Email Row
-               * User's email address used for authentication.
-               */}
-              <DataRow
-                icon={<Mail size={20} color={colors.mutedForeground} />}
-                label="Email"
-                value={user?.email || 'Not provided'}
-              />
-
-              {/**
-               * Display Name Row
-               * Set during sign up via updateProfile().
-               */}
-              <DataRow
-                icon={<CircleUser size={20} color={colors.mutedForeground} />}
-                label="Display Name"
-                value={user?.displayName || 'Not set'}
-              />
-
-              {/**
-               * Email Verified Status
-               * Shows checkmark or X icon based on status.
-               */}
-              <DataRow
-                icon={<Shield size={20} color={colors.mutedForeground} />}
-                label="Email Verified"
-                value={
-                  <View className="flex-row items-center gap-2">
-                    {user?.emailVerified ? (
-                      <>
-                        <CheckCircle size={18} color={colors.primary} />
-                        <Text className="text-primary font-medium">Verified</Text>
-                      </>
-                    ) : (
-                      <>
-                        <XCircle size={18} color={colors.destructive} />
-                        <Text className="text-destructive font-medium">Not Verified</Text>
-                      </>
-                    )}
-                  </View>
-                }
-              />
-            </CardContent>
-          </Card>
-
-          {/**
-           * Learning Preferences Section
-           *
-           * Shows the user's selected learning categories and daily time.
-           * Only displayed if user has completed onboarding.
-           *
-           * PURPOSE:
-           * - Display current learning interests
-           * - Show daily time commitment
-           * - Provide easy access to edit preferences
-           *
-           * DESIGN:
-           * - Card with header and "Edit" button
-           * - Categories shown as display-only chips
-           * - Time shown with clock icon
-           */}
+          {/* ================================================================
+              MY LEARNING SECTION
+              Quick access to learning preferences
+              ================================================================ */}
           {onboardingCompleted && (
-            <Card className="mb-6">
-              <CardHeader>
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-center gap-2">
-                    <BookOpen size={20} color={colors.primary} />
-                    <CardTitle>Learning Preferences</CardTitle>
-                  </View>
-                  {/**
-                   * Edit Button
-                   *
-                   * Navigates to the edit preferences screen.
-                   * Uses a Pressable with text for a subtle, inline style.
-                   */}
-                  <Pressable
-                    onPress={handleEditPreferences}
-                    className="flex-row items-center active:opacity-70"
-                    accessibilityRole="button"
-                    accessibilityLabel="Edit learning preferences"
-                  >
-                    <Text className="text-primary font-medium mr-1">Edit</Text>
-                    <ChevronRight size={16} color={colors.primary} />
-                  </Pressable>
-                </View>
-                <CardDescription>
-                  Your personalized learning settings
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="gap-4">
-                {/**
-                 * Categories Display
-                 *
-                 * Shows selected categories as non-interactive chips.
-                 * Uses CategoryChipGroup for consistent layout.
-                 * Chips are "selected" style but not pressable.
-                 */}
-                <View>
-                  <Text variant="small" className="text-muted-foreground mb-2">
-                    Topics you're learning
-                  </Text>
-                  {categories.length > 0 ? (
-                    <CategoryChipGroup>
-                      {categories.map((category) => (
-                        <CategoryChip
-                          key={category}
-                          label={getCategoryDisplayName(category)}
-                          selected
-                          disabled
-                        />
-                      ))}
-                    </CategoryChipGroup>
-                  ) : (
-                    <Text className="text-muted-foreground italic">
-                      No categories selected
-                    </Text>
-                  )}
-                </View>
-
-                {/**
-                 * Daily Time Display
-                 *
-                 * Shows the user's daily learning time commitment.
-                 * Uses clock icon for visual consistency.
-                 */}
-                <View className="flex-row items-center gap-3 pt-2 border-t border-border">
-                  <View className="w-10 h-10 rounded-lg bg-primary/10 items-center justify-center">
-                    <Clock size={20} color={colors.primary} />
-                  </View>
-                  <View>
-                    <Text variant="small" className="text-muted-foreground">
-                      Daily learning time
-                    </Text>
-                    <Text className="font-medium">
-                      {getTimeDisplayLabel(dailyLearningMinutes)}
-                    </Text>
-                  </View>
-                </View>
-              </CardContent>
-            </Card>
+            <SettingsSection title={t('sections.myLearning')}>
+              <SettingsItem
+                icon={<BookOpen size={20} color={colors.primary} />}
+                label={t('settings.learningPreferences')}
+                subtitle={getLearningPreferencesSubtitle()}
+                type="navigation"
+                onPress={handleEditPreferences}
+                showBorder={false}
+              />
+            </SettingsSection>
           )}
 
-          {/**
-           * Settings Section (Placeholder)
-           *
-           * Quick access to future settings options.
-           * Currently shows what settings could be available.
-           */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Settings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <View className="flex-row items-center py-2">
-                <View className="w-10 h-10 rounded-lg bg-primary/10 items-center justify-center mr-3">
-                  <Settings size={20} color={colors.primary} />
-                </View>
-                <View className="flex-1">
-                  <Text className="font-medium">App Settings</Text>
-                  <Text variant="small" className="text-muted-foreground">
-                    Preferences coming soon
-                  </Text>
-                </View>
-              </View>
-            </CardContent>
-          </Card>
+          {/* ================================================================
+              NOTIFICATIONS SECTION
+              Daily reminder toggle with separate time selector
 
-          {/**
-           * Spacer
-           *
-           * flex-1 pushes the sign out button to the bottom
-           * when there's extra space.
-           */}
-          <View className="flex-1" />
+              DESIGN DECISIONS:
+              1. Toggle row: Enables/disables notifications
+              2. Time row: Only shown when enabled, opens time picker
 
-          {/**
-           * Sign Out Button
-           *
-           * Uses ghost variant with destructive text color for a minimal,
-           * text-only appearance. Less prominent than a filled button,
-           * but still clearly recognizable as an action.
-           *
-           * WHY GHOST INSTEAD OF FILLED?
-           * - Sign out is not a frequent action
-           * - Filled destructive button felt too prominent/alarming
-           * - Ghost with red text is subtle but clear
-           * - Fits our minimal design philosophy
-           */}
+              We use two separate rows because:
+              - SettingsItem with type="toggle" makes the whole row toggle
+              - Having a separate "Reminder Time" row is clearer UX
+              - Users expect chevron = navigation, switch = toggle
+              - This matches iOS Settings app patterns
+              ================================================================ */}
+          <SettingsSection title={t('sections.notifications')}>
+            {/**
+             * Daily Reminder Toggle
+             *
+             * Main toggle for enabling/disabling daily notifications.
+             * Shows "Enabled" or "Disabled" subtitle for clarity.
+             */}
+            <SettingsItem
+              icon={<Bell size={20} color={colors.primary} />}
+              label={t('settings.dailyReminder')}
+              subtitle={notifications.enabled ? t('status.enabled') : t('status.disabled')}
+              type="toggle"
+              value={notifications.enabled}
+              onToggle={handleToggleReminder}
+              showBorder={notifications.enabled} // Show border if time row follows
+            />
+
+            {/**
+             * Reminder Time Selector
+             *
+             * Only shown when notifications are enabled.
+             * Tapping opens the TimePicker modal.
+             *
+             * WHY CONDITIONAL RENDERING?
+             * - Time is irrelevant when notifications are disabled
+             * - Cleaner UI with fewer elements
+             * - Progressive disclosure: show options only when relevant
+             */}
+            {notifications.enabled && (
+              <SettingsItem
+                icon={<Clock size={20} color={colors.primary} />}
+                label={t('settings.reminderTime')}
+                subtitle={getNotificationSubtitle()}
+                type="navigation"
+                onPress={handleTimePress}
+                showBorder={false}
+              />
+            )}
+          </SettingsSection>
+
+          {/* ================================================================
+              ACCOUNT SECTION
+              Email, password, and verification status
+              ================================================================ */}
+          <SettingsSection title={t('sections.account')}>
+            <SettingsItem
+              icon={<Mail size={20} color={colors.primary} />}
+              label={t('settings.changeEmail')}
+              type="navigation"
+              onPress={handleChangeEmail}
+            />
+            <SettingsItem
+              icon={<Lock size={20} color={colors.primary} />}
+              label={t('settings.changePassword')}
+              type="navigation"
+              onPress={handleChangePassword}
+            />
+            <SettingsItem
+              icon={<CheckCircle size={20} color={colors.primary} />}
+              label={t('settings.emailVerified')}
+              type="display"
+              rightElement={
+                user?.emailVerified ? (
+                  <View className="bg-primary/10 px-2 py-1 rounded">
+                    <Text variant="small" className="text-primary font-medium">
+                      {t('status.verified')}
+                    </Text>
+                  </View>
+                ) : (
+                  <View className="bg-destructive/20 px-2 py-1 rounded">
+                    <Text variant="small" className="text-destructive-foreground font-medium">
+                      {t('status.notVerified')}
+                    </Text>
+                  </View>
+                )
+              }
+              showBorder={false}
+            />
+          </SettingsSection>
+
+          {/* ================================================================
+              SUPPORT SECTION
+              Help, feedback, and about
+              ================================================================ */}
+          <SettingsSection title={t('sections.support')}>
+            <SettingsItem
+              icon={<HelpCircle size={20} color={colors.primary} />}
+              label={t('settings.helpFaq')}
+              type="navigation"
+              onPress={handleHelp}
+            />
+            <SettingsItem
+              icon={<MessageSquare size={20} color={colors.primary} />}
+              label={t('settings.sendFeedback')}
+              type="navigation"
+              onPress={handleSendFeedback}
+            />
+            <SettingsItem
+              icon={<Info size={20} color={colors.primary} />}
+              label={t('settings.about')}
+              subtitle={t('settings.version', { version: getAppVersion() })}
+              type="navigation"
+              onPress={handleAbout}
+              showBorder={false}
+            />
+          </SettingsSection>
+
+          {/* Spacer to push sign out to bottom if there's extra space */}
+          <View className="flex-1 min-h-4" />
+
+          {/* ================================================================
+              SIGN OUT BUTTON
+              Destructive action - isolated at bottom
+              ================================================================ */}
           <Button
             variant="ghost"
             onPress={handleSignOut}
             isLoading={loading}
             disabled={loading}
-            leftIcon={<LogOut size={20} color="#991B1B" />}
+            leftIcon={<LogOut size={20} color={colors.destructiveForeground} />}
             className="mt-4"
           >
-            <Text className="text-destructive-foreground font-semibold">Sign Out</Text>
+            <Text className="text-destructive-foreground font-semibold">{t('signOut.button')}</Text>
           </Button>
         </View>
       </ScrollView>
 
-      {/**
-       * ImagePickerSheet
-       *
-       * Bottom sheet that appears when user taps on their avatar.
-       * Provides two options: "Choose from Library" and "Take Photo".
-       *
-       * HOW IT WORKS:
-       * 1. User taps avatar → handleAvatarPress calls expand() on ref
-       * 2. Sheet slides up with two options
-       * 3. User taps an option → handler is called
-       * 4. Sheet closes and image picker/camera opens
-       * 5. If image selected, Redux thunk handles upload
-       *
-       * THE REF PATTERN:
-       * We control the sheet via ref.current.expand() and ref.current.close()
-       * This is the recommended pattern from @gorhom/bottom-sheet
-       * because it avoids unnecessary re-renders.
-       *
-       * PROPS:
-       * - ref: Allows imperative control (expand/close)
-       * - onSelectGallery: Handler for gallery option
-       * - onSelectCamera: Handler for camera option
-       * - onClose: Called when sheet is dismissed
-       */}
+      {/* ====================================================================
+          IMAGE PICKER SHEET
+          Bottom sheet for avatar photo selection
+          ==================================================================== */}
       <ImagePickerSheet
         ref={imagePickerSheetRef}
         onSelectGallery={handleSelectGallery}
         onSelectCamera={handleSelectCamera}
         onClose={handleSheetClose}
       />
+
+      {/* ====================================================================
+          TIME PICKER MODAL
+          Bottom sheet for selecting notification time
+
+          This modal allows users to choose when they want to receive their
+          daily learning reminder. It uses the native time picker wrapped
+          in our BottomSheet component for a consistent UX.
+
+          The picker is shown when:
+          1. User has notifications enabled
+          2. User taps on the time in the notification settings row
+
+          WHY RENDER HERE (outside ScrollView)?
+          - Bottom sheets need to be at the root level
+          - They use portals/modals that overlay the entire screen
+          - If inside ScrollView, they might not position correctly
+          ==================================================================== */}
+      <TimePicker
+        visible={showTimePicker}
+        time={notifications.time ?? DEFAULT_NOTIFICATION_PREFERENCES.time ?? '09:00'}
+        onSave={handleTimeSave}
+        onCancel={handleTimeCancel}
+      />
+
+      {/* ====================================================================
+          PROFILE SUB-SCREEN MODALS
+          Full-screen bottom sheet modals for profile sub-screens
+
+          WHY MODALS INSTEAD OF NAVIGATION?
+          - Tab navigators don't maintain navigation history properly
+          - With navigation, pressing back could go to Home instead of Profile
+          - Modals always dismiss to exactly where they were opened from
+          - Better UX: action feels contained within Profile context
+
+          These modals are rendered at the root level (outside ScrollView)
+          because they use portals and need to overlay the entire screen.
+          ==================================================================== */}
+
+      {/* Edit Preferences Modal */}
+      <EditPreferencesModal ref={editPreferencesModalRef} />
+
+      {/* Change Email Modal */}
+      <ChangeEmailModal ref={changeEmailModalRef} />
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal ref={changePasswordModalRef} />
+
+      {/* Help & FAQ Modal */}
+      <HelpModal ref={helpModalRef} />
+
+      {/* About Modal */}
+      <AboutModal ref={aboutModalRef} />
     </SafeAreaView>
-  );
-}
-
-/**
- * =============================================================================
- * DATA ROW COMPONENT
- * =============================================================================
- *
- * A reusable component for displaying labeled data.
- * Used in the Account Details card.
- *
- * Props:
- * @param icon - Lucide icon component
- * @param label - Label text (e.g., "Email")
- * @param value - Value to display (string or JSX element)
- * @param isMonospace - Whether to use monospace font for value
- */
-interface DataRowProps {
-  icon: React.ReactNode;
-  label: string;
-  value: string | React.ReactNode;
-  isMonospace?: boolean;
-}
-
-function DataRow({ icon, label, value, isMonospace = false }: DataRowProps) {
-  return (
-    <View className="flex-row items-start">
-      {/**
-       * Icon Container
-       * Fixed width ensures alignment across rows.
-       */}
-      <View className="w-8 mt-0.5">
-        {icon}
-      </View>
-
-      {/**
-       * Label and Value Container
-       * flex-1 takes remaining space.
-       */}
-      <View className="flex-1 gap-1">
-        <Text variant="small" className="text-muted-foreground">
-          {label}
-        </Text>
-        {typeof value === 'string' ? (
-          <Text
-            className={isMonospace ? 'font-mono text-sm' : ''}
-            numberOfLines={1}
-          >
-            {value}
-          </Text>
-        ) : (
-          value
-        )}
-      </View>
-    </View>
   );
 }
 
 /**
  * LEARNING NOTES:
  *
- * 1. PROFILE TAB PATTERNS
- *    Profile tabs typically include:
- *    - User avatar and basic info at top
- *    - Account details section
- *    - Settings/preferences links
- *    - Sign out button at bottom
+ * 1. PROFILE SCREEN STRUCTURE
+ *    Mobile profile screens follow a consistent hierarchy:
+ *    - Identity first (who am I?)
+ *    - Personalization (my settings)
+ *    - Account management
+ *    - Support/help
+ *    - Destructive actions last (sign out)
  *
- *    This structure is familiar to users from most apps.
+ *    This matches user mental models and is seen in apps like
+ *    iOS Settings, Spotify, Duolingo, etc.
  *
- * 2. PROFILE IMAGE UPLOAD (PHASE 6)
- *    The profile image feature demonstrates several patterns:
+ * 2. GROUPED LIST PATTERN
+ *    We use SettingsSection to group related items:
+ *    - Clear section headers (uppercase, muted)
+ *    - Card containers for visual grouping
+ *    - Consistent item layout within sections
  *
- *    COMPONENT ARCHITECTURE:
- *    - Avatar: Reusable UI component for displaying images/initials
- *    - ImagePickerSheet: Bottom sheet with camera/gallery options
- *    - useImagePicker: Custom hook for image selection logic
- *    - Redux thunks: Handle async upload to Firebase Storage
+ *    This pattern is scannable and familiar to users.
  *
- *    DATA FLOW:
- *    User taps avatar → Sheet opens → User picks option →
- *    Hook handles permissions → Image selected →
- *    Redux thunk uploads → State updates → Avatar re-renders
+ * 3. COMPONENT EXTRACTION
+ *    We extracted ProfileHeader, SettingsSection, SettingsItem:
+ *    - Single responsibility (each component does one thing)
+ *    - Reusability (can use in other screens)
+ *    - Testability (easier to test in isolation)
+ *    - Maintainability (changes don't affect other logic)
  *
- *    SEPARATION OF CONCERNS:
- *    - UI components know nothing about Firebase
- *    - Hooks handle platform-specific logic (permissions, image picking)
- *    - Redux coordinates multi-service operations
- *    - Services abstract Firebase API calls
+ * 4. WHAT WE REMOVED
+ *    The old profile showed:
+ *    - Firebase UID (technical, meaningless to users)
+ *    - Duplicate email/name (already in header)
+ *    - "Coming soon" placeholder (creates uncertainty)
  *
- * 3. BOTTOM SHEET PATTERN
- *    We use refs for bottom sheets instead of state because:
- *    - @gorhom/bottom-sheet is optimized for imperative control
- *    - Avoids unnecessary re-renders
- *    - Better performance for gesture-driven animations
+ *    Good UX removes unnecessary information.
  *
- *    Pattern: const ref = useRef<BottomSheetRef>(null);
- *    Open:    ref.current?.expand();
- *    Close:   ref.current?.close();
+ * 5. NAVIGATION VS TOGGLE
+ *    We use visual cues to indicate item behavior:
+ *    - Chevron (›) = tappable, goes somewhere
+ *    - Switch = toggles on/off
+ *    - Badge = display only, no interaction
  *
- * 4. SIGN OUT IN PROFILE
- *    Sign out is commonly placed in the Profile tab because:
- *    - It's account-related action
- *    - Users expect to find it here
- *    - It's not a frequent action (shouldn't be prominent elsewhere)
+ *    Users learn these patterns and navigate predictably.
  *
- * 5. REDUX FOR AUTH STATE
- *    We use Redux instead of local state because:
- *    - Auth state is needed across the app
- *    - Other components react to auth changes
- *    - DevTools help debug auth flow
- *    - Centralized state management
- *    - profileImageLoading/Error are separate from main loading/error
+ * 6. ACCESSIBILITY
+ *    - Touch targets are 44pt minimum (p-4 padding)
+ *    - Proper accessibilityRole on interactive items
+ *    - Screen reader labels include subtitles
+ *    - Color isn't the only indicator (icons + text)
  *
- * 6. NAVIGATION AFTER SIGN OUT
- *    We use router.replace('/welcome') because:
- *    - replace() removes current screen from stack
- *    - User can't go "back" to authenticated screens
- *    - Clean navigation history
+ * 7. PLACEHOLDER SCREENS
+ *    Some screens (change-email, change-password, help, about)
+ *    will be created in Phase 3 and 4. For now, navigation
+ *    is wired up to show the intent, even if the screens
+ *    don't exist yet.
  *
- * 7. ERROR HANDLING WITH useEffect
- *    We use useEffect to watch profileImageError because:
- *    - Errors come from async Redux operations
- *    - We want to show an Alert (imperative API)
- *    - Effect ensures we only show alert once per error
- *    - We clear the error after showing it
+ * 8. NOTIFICATION FLOW (Phase 2)
  *
- * 8. SAFE AREA WITH TABS
- *    We use edges={['top']} because:
- *    - Tab bar handles bottom safe area
- *    - We only need top safe area for notch
- *    - Prevents double padding at bottom
+ *    The notification feature demonstrates several important patterns:
  *
- * 9. DESTRUCTIVE BUTTON
- *    The destructive variant signals danger:
- *    - Red/muted styling draws attention
- *    - User knows this is a significant action
- *    - Consistent with UX conventions
+ *    a) PERMISSION HANDLING:
+ *       - iOS: Requires explicit permission (one-time request)
+ *       - Android 13+: Also requires explicit permission
+ *       - We use "pre-permission priming" to explain why before asking
+ *       - If denied, we direct users to system Settings
  *
- * FUTURE ENHANCEMENTS:
- * - Add "Remove Photo" option to ImagePickerSheet
- * - Add edit profile functionality
- * - Add email verification sending
- * - Add additional user data from Firestore
- * - Add settings navigation
- * - Add notification preferences
- * - Add theme/appearance settings
+ *    b) STATE MANAGEMENT:
+ *       - Redux stores user preference (enabled, time)
+ *       - Permission status is device-specific (not in Firestore)
+ *       - We sync permission status on screen mount
+ *
+ *    c) DATA PERSISTENCE:
+ *       - Notification preferences stored in Firestore
+ *       - Time stored as "HH:MM" (timezone-independent)
+ *       - Permission status NOT stored (device-specific)
+ *
+ *    d) SCHEDULING:
+ *       - Uses Expo's local notification system
+ *       - Daily trigger at specified time in local timezone
+ *       - Notification rescheduled when time changes
+ *       - Canceled when user disables
+ *
+ *    e) TIME FORMAT CONVERSION:
+ *       - Storage: "HH:MM" 24-hour format (e.g., "14:30")
+ *       - Display: 12-hour with AM/PM (e.g., "2:30 PM")
+ *       - DateTimePicker: Date object
+ *       - Helper functions handle conversions
+ *
+ * 9. MODAL PATTERNS
+ *
+ *    This screen uses two bottom sheet modals:
+ *    - ImagePickerSheet: For avatar photo selection
+ *    - TimePicker: For notification time selection
+ *
+ *    Both are rendered outside the ScrollView because:
+ *    - They use absolute positioning / portals
+ *    - Need to overlay the entire screen
+ *    - ScrollView would constrain them incorrectly
+ *
+ *    Each modal has:
+ *    - Controlled visibility (parent manages open/close state)
+ *    - Callbacks for actions (save, cancel)
+ *    - Swipe-to-dismiss gesture support
  */

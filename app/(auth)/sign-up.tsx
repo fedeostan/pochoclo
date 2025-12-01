@@ -65,6 +65,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { Text, Button, Input, NavBar, useNavBarHeight } from '@/components/ui';
 import { useAppDispatch, useAppSelector } from '@/store';
 import { signUp, clearError } from '@/store/slices/authSlice';
@@ -96,6 +97,12 @@ import { validateEmail } from '@/utils/validation';
  * - Catching mismatches before submission saves frustration
  */
 export default function SignUpScreen() {
+  /**
+   * Translation Hooks
+   */
+  const { t } = useTranslation('auth');
+  const { t: tCommon } = useTranslation('common');
+
   /**
    * Redux Hooks
    *
@@ -250,14 +257,14 @@ export default function SignUpScreen() {
     // Validate password length
     // Firebase requires at least 6 characters
     if (password.length < 6) {
-      setValidationError('Password must be at least 6 characters');
+      setValidationError(tCommon('validation.passwordMinLength'));
       return;
     }
 
     // Validate password confirmation
     // This catches typos before they become a problem
     if (password !== confirmPassword) {
-      setValidationError('Passwords do not match');
+      setValidationError(tCommon('validation.passwordsDoNotMatch'));
       return;
     }
 
@@ -414,10 +421,10 @@ export default function SignUpScreen() {
             <View className="mb-8">
               {/* Screen Title */}
               <Text variant="h1" className="mb-2">
-                Create Account
+                {t('signUp.title')}
               </Text>
               <Text variant="lead">
-                Join us and start your learning journey
+                {t('signUp.subtitle')}
               </Text>
             </View>
 
@@ -447,8 +454,8 @@ export default function SignUpScreen() {
                * - Shows we care about the person, not just the account
                */}
               <Input
-                label="Display Name"
-                placeholder="How should we call you?"
+                label={t('signUp.displayNameLabel')}
+                placeholder={t('signUp.displayNamePlaceholder')}
                 value={displayName}
                 onChangeText={setDisplayName}
                 autoCapitalize="words"
@@ -465,8 +472,8 @@ export default function SignUpScreen() {
                * - No auto-correct (don't change email addresses)
                */}
               <Input
-                label="Email"
-                placeholder="your.email@example.com"
+                label={t('signUp.emailLabel')}
+                placeholder={t('signUp.emailPlaceholder')}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -490,8 +497,8 @@ export default function SignUpScreen() {
                * when secureTextEntry is true.
                */}
               <Input
-                label="Password"
-                placeholder="At least 6 characters"
+                label={t('signUp.passwordLabel')}
+                placeholder={t('signUp.passwordPlaceholder')}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
@@ -512,8 +519,8 @@ export default function SignUpScreen() {
                * "Done" on the keyboard - convenient for quick sign-ups.
                */}
               <Input
-                label="Confirm Password"
-                placeholder="Type your password again"
+                label={t('signUp.confirmPasswordLabel')}
+                placeholder={t('signUp.confirmPasswordPlaceholder')}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry
@@ -584,7 +591,7 @@ export default function SignUpScreen() {
             disabled={loading || !isFormValid}
             className="mb-3"
           >
-            Create Account
+            {t('signUp.button')}
           </Button>
 
           {/**
@@ -595,9 +602,9 @@ export default function SignUpScreen() {
            * Grouped with button for cohesive bottom action area.
            */}
           <View className="flex-row justify-center items-center py-2">
-            <Text variant="muted">Already have an account? </Text>
+            <Text variant="muted">{t('signUp.hasAccount')} </Text>
             <Pressable onPress={handleSignIn}>
-              <Text className="text-primary font-semibold">Sign In</Text>
+              <Text className="text-primary font-semibold">{t('signUp.signIn')}</Text>
             </Pressable>
           </View>
         </View>

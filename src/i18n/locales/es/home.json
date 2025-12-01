@@ -1,0 +1,33 @@
+{
+  "stats": {
+    "thisWeek": "esta semana",
+    "saved": "guardados"
+  },
+  "error": {
+    "title": "Algo salió mal",
+    "tryAgain": "Intentar de nuevo"
+  },
+  "empty": {
+    "title": "¿Listo para aprender algo nuevo?",
+    "subtitle": "Tu contenido personalizado está esperando.",
+    "button": "Obtener contenido"
+  },
+  "hint": {
+    "pullToRefresh": "Desliza hacia abajo para saltar y obtener nuevo contenido"
+  },
+  "postReading": {
+    "articleSingular": "artículo esta semana",
+    "articlePlural": "artículos esta semana",
+    "encouragement": {
+      "start": "¡Buen comienzo!",
+      "rolling": "¡Vas muy bien!",
+      "keepUp": "¡Bien! ¡Sigue así!",
+      "impressive": "¡Semana impresionante!",
+      "crushing": "¡Lo estás logrando!",
+      "incredible": "¡Dedicación increíble!"
+    },
+    "readyToStart": "¿Listo para empezar a aprender?",
+    "getMore": "Obtener más contenido",
+    "maybeLater": "Es suficiente por ahora"
+  }
+}

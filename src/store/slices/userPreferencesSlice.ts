@@ -36,14 +36,104 @@ import {
   getUserPreferences,
   saveUserPreferences,
   updateUserPreferences,
+  updateNotificationPreferences,
 } from '../../services/userPreferencesService';
-import { SavePreferencesInput } from '../../types/preferences';
+import { getWeeklyReadingCount } from '../../services/firebase/contentHistoryService';
+import { getSavedContentCount } from '../../services/firebase/savedContentService';
+import {
+  SavePreferencesInput,
+  NotificationPreferences,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+} from '../../types/preferences';
 
 /**
  * =============================================================================
  * STATE INTERFACE
  * =============================================================================
  */
+
+/**
+ * Weekly Stats State Interface
+ *
+ * Represents the user's reading statistics in Redux.
+ * Used to display streak/count in MinimalStatsBar on HomeScreen.
+ *
+ * WHY STORE IN REDUX?
+ * - Persists across component re-renders and navigation
+ * - Available immediately when app loads (no loading flash)
+ * - Can be updated optimistically when user reads content
+ * - Single source of truth for all components that need stats
+ *
+ * WHY NOT FIRESTORE?
+ * - These are computed values derived from contentHistory
+ * - Storing would create data duplication
+ * - Computed on-demand from source of truth (contentHistory)
+ */
+interface WeeklyStatsState {
+  /**
+   * Number of articles the user READ this week (Sunday-Saturday).
+   * Calculated from contentHistory entries with viewed: true
+   * and viewedAt within the current week.
+   */
+  weeklyReadCount: number;
+
+  /**
+   * Total number of saved/bookmarked articles.
+   * Fetched from savedContent collection count.
+   */
+  savedCount: number;
+
+  /**
+   * Whether stats are currently being fetched.
+   * Used to show loading state in UI.
+   */
+  statsLoading: boolean;
+}
+
+/**
+ * Notification State Interface
+ *
+ * Represents the notification-related state in Redux.
+ * Separated for clarity, but embedded in UserPreferencesState.
+ *
+ * WHY INCLUDE permissionStatus IN REDUX?
+ * - The UI needs to know current permission status
+ * - Determines what we show in notification settings:
+ *   - 'undetermined': Can ask for permission
+ *   - 'granted': Can enable/disable and change time
+ *   - 'denied': Show message about going to settings
+ * - Persisted in Redux, not Firestore (device-specific)
+ */
+interface NotificationState {
+  /**
+   * Whether notifications are enabled (user's preference)
+   *
+   * This is the user's PREFERENCE - they want notifications.
+   * Actual notification scheduling also depends on permissionStatus.
+   */
+  enabled: boolean;
+
+  /**
+   * Time for daily notification in "HH:MM" format
+   *
+   * null means no time selected yet (uses default "09:00").
+   */
+  time: string | null;
+
+  /**
+   * System permission status for notifications
+   *
+   * IMPORTANT: This is the OS-level permission, not user preference.
+   * - 'undetermined': Haven't asked yet
+   * - 'granted': OS allows notifications
+   * - 'denied': OS blocks notifications (must change in Settings)
+   *
+   * WHY NOT IN FIRESTORE?
+   * Permission is device-specific. If user has app on multiple devices,
+   * each device has its own permission status.
+   */
+  permissionStatus: 'undetermined' | 'granted' | 'denied';
+}
 
 /**
  * UserPreferencesState Interface
@@ -65,6 +155,10 @@ import { SavePreferencesInput } from '../../types/preferences';
  *   Whether the user has finished the onboarding flow.
  *   Used for navigation decisions (show onboarding or home).
  *
+ * notifications:
+ *   User's notification preferences and current permission status.
+ *   See NotificationState interface for details.
+ *
  * loading:
  *   True when fetching preferences from Firestore.
  *   Used to show loading states in UI.
@@ -82,6 +176,12 @@ interface UserPreferencesState {
   categories: string[];
   dailyLearningMinutes: number | null;
   onboardingCompleted: boolean;
+  notifications: NotificationState;
+  /**
+   * Weekly reading statistics for MinimalStatsBar.
+   * Loaded on app startup and updated when user reads content.
+   */
+  stats: WeeklyStatsState;
   loading: boolean;
   saving: boolean;
   error: string | null;
@@ -92,11 +192,34 @@ interface UserPreferencesState {
  *
  * The starting state when the app loads.
  * All values are "empty" - preferences haven't been loaded yet.
+ *
+ * NOTIFICATION INITIAL STATE:
+ * - enabled: false (from DEFAULT_NOTIFICATION_PREFERENCES)
+ * - time: '09:00' (from DEFAULT_NOTIFICATION_PREFERENCES)
+ * - permissionStatus: 'undetermined' (we'll check on app load)
+ *
+ * STATS INITIAL STATE:
+ * - weeklyReadCount: 0 (will be fetched from Firestore)
+ * - savedCount: 0 (will be fetched from Firestore)
+ * - statsLoading: false (not loading yet)
  */
 const initialState: UserPreferencesState = {
   categories: [],
   dailyLearningMinutes: null,
   onboardingCompleted: false,
+  notifications: {
+    // Use defaults from preferences types
+    enabled: DEFAULT_NOTIFICATION_PREFERENCES.enabled,
+    time: DEFAULT_NOTIFICATION_PREFERENCES.time,
+    // Permission status starts as undetermined - we check on app load
+    permissionStatus: 'undetermined',
+  },
+  stats: {
+    // Stats start at 0 - will be fetched on app load
+    weeklyReadCount: 0,
+    savedCount: 0,
+    statsLoading: false,
+  },
   loading: false,
   saving: false,
   error: null,
@@ -138,10 +261,20 @@ export const loadPreferences = createAsyncThunk(
 
       // Return preferences or default values if null
       // This handles the case where user hasn't completed onboarding yet
+      //
+      // NOTIFICATION LOADING:
+      // - If preferences.notifications exists, use those values
+      // - If not (older users), use defaults
+      // - permissionStatus is NOT loaded from Firestore (it's device-specific)
       return {
         categories: preferences?.categories ?? [],
         dailyLearningMinutes: preferences?.dailyLearningMinutes ?? null,
         onboardingCompleted: preferences?.onboardingCompleted ?? false,
+        // Notifications: merge with defaults to handle missing fields
+        notifications: {
+          enabled: preferences?.notifications?.enabled ?? DEFAULT_NOTIFICATION_PREFERENCES.enabled,
+          time: preferences?.notifications?.time ?? DEFAULT_NOTIFICATION_PREFERENCES.time,
+        },
       };
 
     } catch (error) {
@@ -252,6 +385,119 @@ export const updatePreferencesAsync = createAsyncThunk(
       console.error('Error updating preferences:', error);
       return rejectWithValue(
         error instanceof Error ? error.message : 'Failed to update preferences'
+      );
+    }
+  }
+);
+
+/**
+ * Save Notification Preferences Input Type
+ *
+ * Payload for saving notification preferences to Firestore.
+ */
+interface SaveNotificationPreferencesPayload {
+  userId: string;
+  notifications: NotificationPreferences;
+}
+
+/**
+ * Save Notification Preferences Thunk
+ *
+ * Saves notification preferences to Firestore independently of other preferences.
+ * Used when user changes notification settings.
+ *
+ * WHEN TO CALL:
+ * - User toggles notifications on/off
+ * - User changes notification time
+ * - After successful permission request
+ *
+ * WHY SEPARATE FROM savePreferences?
+ * - Notification settings change independently
+ * - Smaller, focused updates
+ * - Don't need to touch categories or learning time
+ *
+ * FLOW:
+ * 1. dispatch(saveNotificationPreferencesAsync({ userId, notifications }))
+ * 2. pending: saving = true
+ * 3. Firestore update (only notifications field)
+ * 4. fulfilled: Redux notification state updated
+ * 5. rejected: Error set
+ *
+ * @param payload - { userId, notifications }
+ * @returns The saved notifications (for Redux update)
+ */
+export const saveNotificationPreferencesAsync = createAsyncThunk(
+  'userPreferences/saveNotifications',
+  async (payload: SaveNotificationPreferencesPayload, { rejectWithValue }) => {
+    try {
+      const { userId, notifications } = payload;
+
+      // Save to Firestore using the dedicated notification update function
+      await updateNotificationPreferences(userId, notifications);
+
+      // Return the notifications to update Redux state
+      return notifications;
+
+    } catch (error) {
+      console.error('Error saving notification preferences:', error);
+      return rejectWithValue(
+        error instanceof Error ? error.message : 'Failed to save notification preferences'
+      );
+    }
+  }
+);
+
+/**
+ * Fetch Weekly Stats Thunk
+ *
+ * Fetches the user's weekly reading count and saved content count from Firestore.
+ * Called on app startup (in _layout.tsx) to populate the stats immediately.
+ *
+ * WHEN TO CALL:
+ * - On app startup after user is authenticated
+ * - After user reads/dismisses content (to refresh count)
+ * - On pull-to-refresh in HomeScreen
+ *
+ * WHY A SEPARATE THUNK?
+ * - Stats are independent from preferences
+ * - Loaded separately from loadPreferences (called at different times)
+ * - Keeps concerns separated for better maintainability
+ *
+ * FLOW:
+ * 1. dispatch(fetchWeeklyStats(userId))
+ * 2. pending: statsLoading = true
+ * 3. Parallel fetch: getWeeklyReadingCount + getSavedContentCount
+ * 4. fulfilled: stats updated, statsLoading = false
+ * 5. rejected: error handled gracefully (stats remain 0)
+ *
+ * @param userId - The user's UID
+ * @returns Object with weeklyReadCount and savedCount
+ */
+export const fetchWeeklyStats = createAsyncThunk(
+  'userPreferences/fetchWeeklyStats',
+  async (userId: string, { rejectWithValue }) => {
+    try {
+      console.log('[UserPreferences] Fetching weekly stats for user:', userId);
+
+      // Fetch both counts in parallel for efficiency
+      const [weeklyReadCount, savedCount] = await Promise.all([
+        getWeeklyReadingCount(userId),
+        getSavedContentCount(userId),
+      ]);
+
+      console.log('[UserPreferences] Stats fetched - weekly:', weeklyReadCount, 'saved:', savedCount);
+
+      return {
+        weeklyReadCount,
+        savedCount,
+      };
+
+    } catch (error) {
+      console.error('[UserPreferences] Error fetching weekly stats:', error);
+      // Return 0s on error instead of rejecting - stats are non-critical
+      // This prevents the UI from showing error states for minor issues
+      return rejectWithValue(
+        error instanceof Error ? error.message : 'Failed to fetch weekly stats'
       );
     }
   }
@@ -374,6 +620,16 @@ const userPreferencesSlice = createSlice({
      * When user logs out and another user logs in,
      * we don't want the previous user's preferences showing.
      *
+     * CLEARS:
+     * - Categories
+     * - Daily learning minutes
+     * - Onboarding status
+     * - Notification preferences (enabled, time)
+     * - Loading/saving/error states
+     *
+     * NOTE: Permission status is reset to 'undetermined'
+     * The next user may have different OS permissions.
+     *
      * USAGE:
      * dispatch(clearPreferences()); // In signOut handler
      */
@@ -381,6 +637,18 @@ const userPreferencesSlice = createSlice({
       state.categories = [];
       state.dailyLearningMinutes = null;
       state.onboardingCompleted = false;
+      // Reset notifications to defaults
+      state.notifications = {
+        enabled: DEFAULT_NOTIFICATION_PREFERENCES.enabled,
+        time: DEFAULT_NOTIFICATION_PREFERENCES.time,
+        permissionStatus: 'undetermined',
+      };
+      // Reset stats to defaults
+      state.stats = {
+        weeklyReadCount: 0,
+        savedCount: 0,
+        statsLoading: false,
+      };
       state.loading = false;
       state.saving = false;
       state.error = null;
@@ -411,6 +679,141 @@ const userPreferencesSlice = createSlice({
     setOnboardingCompleted: (state, action: PayloadAction<boolean>) => {
       state.onboardingCompleted = action.payload;
     },
+
+    // =========================================================================
+    // NOTIFICATION ACTIONS
+    // =========================================================================
+
+    /**
+     * Set Notification Enabled
+     *
+     * Updates whether notifications are enabled in Redux state.
+     * This is a LOCAL state update - use saveNotificationPreferencesAsync
+     * to persist to Firestore.
+     *
+     * WHEN TO USE:
+     * - Optimistic update when user toggles notification switch
+     * - After confirming permission was granted
+     *
+     * IMPORTANT: This only updates Redux, NOT Firestore!
+     * Always follow up with saveNotificationPreferencesAsync for persistence.
+     *
+     * USAGE:
+     * dispatch(setNotificationEnabled(true));
+     * // Then save to Firestore:
+     * dispatch(saveNotificationPreferencesAsync({
+     *   userId,
+     *   notifications: { enabled: true, time: currentTime }
+     * }));
+     */
+    setNotificationEnabled: (state, action: PayloadAction<boolean>) => {
+      state.notifications.enabled = action.payload;
+    },
+
+    /**
+     * Set Notification Time
+     *
+     * Updates the notification time in Redux state.
+     * Time should be in "HH:MM" format (24-hour).
+     *
+     * WHEN TO USE:
+     * - User changes time in notification settings
+     * - Optimistic update before Firestore save
+     *
+     * IMPORTANT: This only updates Redux, NOT Firestore!
+     * Always follow up with saveNotificationPreferencesAsync for persistence.
+     *
+     * USAGE:
+     * dispatch(setNotificationTime('14:30')); // Set to 2:30 PM
+     */
+    setNotificationTime: (state, action: PayloadAction<string | null>) => {
+      state.notifications.time = action.payload;
+    },
+
+    /**
+     * Set Notification Permission Status
+     *
+     * Updates the system permission status in Redux.
+     * Called after checking or requesting permission.
+     *
+     * WHY THIS IS A SYNCHRONOUS ACTION:
+     * - Permission status is device-specific (not in Firestore)
+     * - Checked on app load or when user visits notification settings
+     * - No need for async thunk since it's just local state
+     *
+     * WHEN TO USE:
+     * - After calling getNotificationPermissionStatus()
+     * - After calling requestNotificationPermission()
+     * - On app startup to sync with current OS permission
+     *
+     * USAGE:
+     * import { getNotificationPermissionStatus } from '@/services/notificationService';
+     *
+     * const status = await getNotificationPermissionStatus();
+     * dispatch(setNotificationPermissionStatus(status));
+     */
+    setNotificationPermissionStatus: (
+      state,
+      action: PayloadAction<'undetermined' | 'granted' | 'denied'>
+    ) => {
+      state.notifications.permissionStatus = action.payload;
+    },
+
+    // =========================================================================
+    // STATS ACTIONS
+    // =========================================================================
+
+    /**
+     * Increment Weekly Read Count
+     *
+     * Optimistically increments the weekly read count by 1.
+     * Called immediately when user marks content as read/dismissed.
+     *
+     * WHY OPTIMISTIC UPDATE?
+     * - Provides instant feedback in the UI
+     * - User sees their progress increase immediately
+     * - The actual Firestore write happens in the background
+     *
+     * USAGE:
+     * // When user dismisses content after reading:
+     * await markContentViewed(userId, historyId);
+     * dispatch(incrementWeeklyReadCount());
+     */
+    incrementWeeklyReadCount: (state) => {
+      state.stats.weeklyReadCount += 1;
+    },
+
+    /**
+     * Update Saved Count
+     *
+     * Updates the saved content count.
+     * Called when user saves or unsaves content.
+     *
+     * @param delta - Number to add (1 for save, -1 for unsave)
+     *
+     * USAGE:
+     * // When user saves content:
+     * dispatch(updateSavedCount(1));
+     * // When user unsaves content:
+     * dispatch(updateSavedCount(-1));
+     */
+    updateSavedCount: (state, action: PayloadAction<number>) => {
+      state.stats.savedCount = Math.max(0, state.stats.savedCount + action.payload);
+    },
+
+    /**
+     * Set Stats
+     *
+     * Directly sets both stat values.
+     * Used when refreshing stats from Firestore.
+     *
+     * USAGE:
+     * dispatch(setStats({ weeklyReadCount: 5, savedCount: 10 }));
+     */
+    setStats: (state, action: PayloadAction<{ weeklyReadCount: number; savedCount: number }>) => {
+      state.stats.weeklyReadCount = action.payload.weeklyReadCount;
+      state.stats.savedCount = action.payload.savedCount;
+    },
   },
 
   /**
@@ -432,6 +835,11 @@ const userPreferencesSlice = createSlice({
         state.categories = action.payload.categories;
         state.dailyLearningMinutes = action.payload.dailyLearningMinutes;
         state.onboardingCompleted = action.payload.onboardingCompleted;
+        // Update notification preferences from Firestore
+        // Note: permissionStatus is NOT updated here (it's device-specific)
+        // The UI should call getNotificationPermissionStatus separately
+        state.notifications.enabled = action.payload.notifications.enabled;
+        state.notifications.time = action.payload.notifications.time;
       })
       .addCase(loadPreferences.rejected, (state, action) => {
         state.loading = false;
@@ -484,6 +892,68 @@ const userPreferencesSlice = createSlice({
       .addCase(updatePreferencesAsync.rejected, (state, action) => {
         state.saving = false;
         state.error = (action.payload as string) ?? 'Failed to update preferences';
+      })
+
+      // =========================================================================
+      // SAVE NOTIFICATION PREFERENCES
+      // =========================================================================
+      /**
+       * Handles the saveNotificationPreferencesAsync thunk states.
+       *
+       * WHY SEPARATE HANDLERS FOR NOTIFICATIONS?
+       * - Notification updates are independent of other preferences
+       * - Only updates notification-related state fields
+       * - Cleaner, more focused state management
+       */
+      .addCase(saveNotificationPreferencesAsync.pending, (state) => {
+        // Use 'saving' flag to indicate async operation in progress
+        // UI can show loading state on save button
+        state.saving = true;
+        state.error = null;
+      })
+      .addCase(saveNotificationPreferencesAsync.fulfilled, (state, action) => {
+        state.saving = false;
+        // Update notification state with saved values
+        // The action.payload contains the NotificationPreferences that were saved
+        state.notifications.enabled = action.payload.enabled;
+        state.notifications.time = action.payload.time;
+        // Note: permissionStatus is NOT updated here - it's device-specific
+        // and not stored in Firestore
+      })
+      .addCase(saveNotificationPreferencesAsync.rejected, (state, action) => {
+        state.saving = false;
+        state.error = (action.payload as string) ?? 'Failed to save notification preferences';
+        // Note: We don't revert the notification state on failure
+        // because the synchronous actions may have already updated it.
+        // The UI should handle this by showing an error message
+        // and potentially re-syncing state from Firestore.
+      })
+
+      // =========================================================================
+      // FETCH WEEKLY STATS
+      // =========================================================================
+      /**
+       * Handles the fetchWeeklyStats thunk states.
+       *
+       * Stats are fetched on app startup and when user actions might change counts.
+       * We use a separate loading state (statsLoading) to not interfere with
+       * other loading states like preferences loading.
+       */
+      .addCase(fetchWeeklyStats.pending, (state) => {
+        state.stats.statsLoading = true;
+        // Don't clear error - stats errors are non-critical
+      })
+      .addCase(fetchWeeklyStats.fulfilled, (state, action) => {
+        state.stats.statsLoading = false;
+        state.stats.weeklyReadCount = action.payload.weeklyReadCount;
+        state.stats.savedCount = action.payload.savedCount;
+      })
+      .addCase(fetchWeeklyStats.rejected, (state) => {
+        state.stats.statsLoading = false;
+        // Don't set error - stats errors are non-critical
+        // Stats will remain at their previous values (or 0 if never loaded)
+        // This is fine because stats are nice-to-have, not essential
+        console.warn('[UserPreferences] Stats fetch failed - using cached values');
       });
   },
 });
@@ -495,20 +965,43 @@ const userPreferencesSlice = createSlice({
  * Import and dispatch these in components.
  *
  * USAGE IN COMPONENTS:
- * import { toggleCategory, setDailyTime } from '@/store/slices/userPreferencesSlice';
+ * import {
+ *   toggleCategory,
+ *   setDailyTime,
+ *   setNotificationEnabled,
+ *   setNotificationTime,
+ *   setNotificationPermissionStatus,
+ * } from '@/store/slices/userPreferencesSlice';
  *
+ * // Category/time actions
  * dispatch(toggleCategory('technology'));
  * dispatch(setDailyTime(15));
+ *
+ * // Notification actions
+ * dispatch(setNotificationEnabled(true));
+ * dispatch(setNotificationTime('14:30'));
+ * dispatch(setNotificationPermissionStatus('granted'));
  */
 export const {
+  // Category actions
   setCategories,
   addCategory,
   removeCategory,
   toggleCategory,
+  // Time action
   setDailyTime,
+  // General actions
   clearPreferences,
   clearPreferencesError,
   setOnboardingCompleted,
+  // Notification actions
+  setNotificationEnabled,
+  setNotificationTime,
+  setNotificationPermissionStatus,
+  // Stats actions
+  incrementWeeklyReadCount,
+  updateSavedCount,
+  setStats,
 } = userPreferencesSlice.actions;
 
 /**
@@ -621,4 +1114,60 @@ export default userPreferencesSlice.reducer;
  *    if (user && !onboardingCompleted) {
  *      router.replace('/onboarding/category-selection');
  *    }
+ *
+ * 7. NOTIFICATION STATE MANAGEMENT
+ *
+ *    The notification state has three parts:
+ *    - enabled: User's preference (stored in Firestore)
+ *    - time: User's preferred time (stored in Firestore)
+ *    - permissionStatus: OS permission (NOT in Firestore, device-specific)
+ *
+ *    WHY PERMISSION STATUS IS LOCAL ONLY:
+ *    If User A has the app on iPhone and iPad:
+ *    - iPhone might have notifications enabled
+ *    - iPad might have notifications disabled
+ *    - Each device has its own permission state
+ *    - So we DON'T store permission in Firestore
+ *
+ *    NOTIFICATION FLOW:
+ *    1. User opens notification settings
+ *    2. Check current permission: getNotificationPermissionStatus()
+ *    3. Update Redux: dispatch(setNotificationPermissionStatus(status))
+ *    4. If user enables and permission needed:
+ *       - Call requestNotificationPermission()
+ *       - Update permission status
+ *    5. If permission granted:
+ *       - Schedule notification: scheduleDailyNotification(time)
+ *       - Save preference: dispatch(saveNotificationPreferencesAsync(...))
+ *    6. If user changes time:
+ *       - Reschedule notification
+ *       - Save preference
+ *
+ *    EXAMPLE USAGE:
+ *    import {
+ *      getNotificationPermissionStatus,
+ *      requestNotificationPermission,
+ *      scheduleDailyNotification,
+ *      cancelDailyNotification,
+ *    } from '@/services/notificationService';
+ *
+ *    // On notification toggle
+ *    const handleToggle = async (enabled: boolean) => {
+ *      if (enabled) {
+ *        const granted = await requestNotificationPermission();
+ *        if (granted) {
+ *          await scheduleDailyNotification(time);
+ *          dispatch(saveNotificationPreferencesAsync({
+ *            userId,
+ *            notifications: { enabled: true, time }
+ *          }));
+ *        }
+ *      } else {
+ *        await cancelDailyNotification();
+ *        dispatch(saveNotificationPreferencesAsync({
+ *          userId,
+ *          notifications: { enabled: false, time }
+ *        }));
+ *      }
+ *    };
  */
