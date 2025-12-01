@@ -26,4 +26,8 @@ module.exports = withNativeWind(config, {
   // The CSS file that contains our Tailwind directives
   // This is where we define our global styles and import Tailwind
   input: "./src/styles/global.css",
+  // inlineRem: Converts rem units to pixels for consistency across environments
+  // 16 means 1rem = 16px (standard browser default)
+  // This helps avoid issues in EAS Build where rem calculations might differ
+  inlineRem: 16,
 });
